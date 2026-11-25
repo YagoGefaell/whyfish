@@ -60,7 +60,7 @@ umbrales de Δ** (Excelente, Buena, Imprecisión, Error, Grave error). Gana la p
 
 | Símbolo | Categoría   | Regla                                                                          |
 |---------|-------------|--------------------------------------------------------------------------------|
-| 📖      | Teoría      | La posición resultante está en el libro de aperturas (dataset `lichess-org/chess-openings`). |
+| 📖      | Teoría      | La posición resultante está en el libro de aperturas (dataset `lichess-org/chess-openings`) **y Δ < 10**; si no, se clasifica normalmente (el libro contiene trampas como "Barnes Opening: Fool's Mate"). |
 | !!      | Brillante   | Ver 3.1.                                                                       |
 | !       | Gran jugada | Ver 3.2.                                                                       |
 | ★       | Mejor       | Es la jugada nº 1 del motor (o Δ ≈ 0).                                         |
@@ -79,13 +79,17 @@ Todas deben cumplirse:
      principal (configurable) y no se recupera inmediatamente con una recaptura obvia; o
    - tras la jugada, **cualquier pieza propia** (no solo la movida) queda en prise según el SEE
      —el rival ganaría ≥ 2 puntos capturándola, descontando lo que capturó la propia jugada— y
-     antes no lo estaba (p. ej. Byrne–Fischer 1956, …Be6!!, que deja colgada la dama).
+     antes no lo estaba, **o ya lo estaba pero existía una jugada que la ponía a salvo y no se
+     hizo** (p. ej. Byrne–Fischer 1956, 17…Be6!!, que deja la dama atacada en b6). Una pieza
+     atrapada que se pierde de todos modos no cuenta.
 3. La posición **no** estaba ya totalmente ganada antes (win% previo < 90).
-4. La posición resultante es buena para el jugador (win% posterior ≥ 50).
+4. La posición resultante es al menos igualada para el jugador (win% posterior ≥ 45,
+   configurable; p. ej. Kasparov–Topalov 1999, 24.Rxd4!!, ≈ 46 %).
 
 ### 3.2 Gran jugada (!)
-Es la mejor jugada, no es la única jugada legal ni una recaptura obvia (captura en la casilla
-donde el rival acaba de capturar), y se cumple al menos una de estas condiciones:
+Es la mejor jugada, no es la única jugada legal, ni una recaptura obvia (captura en la casilla
+donde el rival acaba de capturar), ni un **mate en una** (esos quedan como ★), y se cumple al
+menos una de estas condiciones:
 - a) la segunda opción del MultiPV es ≥ 10 puntos de win% peor; o
 - b) la segunda opción cambia de **categoría de resultado** respecto a la mejor: ganado
   (win% > 75), igualado o perdido (win% < 25). Umbrales configurables.
@@ -102,7 +106,9 @@ importadas habrá que indicarlo). Hasta 5, en este orden:
 Las jugadas del bot (o del rival) nunca son momentos clave.
 
 ### 3.5 Tests de clasificación
-`tests/fixtures/` contiene posiciones con la clasificación esperada: sacrificios
+`tests/fixtures/classification/real_positions.json` (partidas en `tests/fixtures/games/`, con la
+fuente de cada posición) se clasifica con Stockfish real a profundidad fija 16, un hilo,
+MultiPV 3. `tests/fixtures/` contiene posiciones con la clasificación esperada: sacrificios
 brillantes conocidos (p. ej. de partidas clásicas), "única jugada" en finales, errores
 graves tácticos, recapturas obvias (no deben ser "!"). Los umbrales se ajustan contra estos fixtures.
 

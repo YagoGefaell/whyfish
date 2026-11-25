@@ -32,18 +32,36 @@ class TestSee:
         assert material.see(board, chess.D5) == 3
 
 
-class TestNewlyEnPrise:
+class TestLeftEnPrise:
     def test_moving_piece_into_pawn_attack(self) -> None:
         board = chess.Board("4k3/8/2p5/8/8/2N5/8/4K3 w - - 0 1")
-        hanging = material.newly_en_prise(board, chess.Move.from_uci("c3b5"), 2)
+        hanging = material.left_en_prise(board, chess.Move.from_uci("c3b5"), 2)
         assert [sq for sq, _ in hanging] == [chess.B5]
 
     def test_even_trade_is_not_a_sacrifice(self) -> None:
         board = chess.Board("3qk3/8/8/8/8/8/8/3QK3 w - - 0 1")
-        assert material.newly_en_prise(board, chess.Move.from_uci("d1d8"), 2) == []
+        assert material.left_en_prise(board, chess.Move.from_uci("d1d8"), 2) == []
 
     def test_unmoved_queen_left_en_prise(self) -> None:
         # The bishop on e2 blocks the rook's attack on the queen; moving it exposes the queen.
         board = chess.Board("4r1k1/8/8/8/8/8/4B3/4Q1K1 w - - 0 1")
-        hanging = material.newly_en_prise(board, chess.Move.from_uci("e2b5"), 2)
+        hanging = material.left_en_prise(board, chess.Move.from_uci("e2b5"), 2)
         assert hanging == [(chess.E1, 9)]  # Rxe1+ wins the queen for nothing
+
+    def test_piece_already_attacked_and_left_counts_if_it_could_be_saved(self) -> None:
+        # The knight on d5 is attacked by the c6 pawn; white plays a king move instead of saving it.
+        board = chess.Board("4k3/8/2p5/3N4/8/8/8/4K3 w - - 0 1")
+        hanging = material.left_en_prise(board, chess.Move.from_uci("e1d2"), 2)
+        assert [sq for sq, _ in hanging] == [chess.D5]
+
+    def test_trapped_piece_that_is_lost_anyway_does_not_count(self) -> None:
+        # Bishop a7 attacked by Ra8: Bb8 is covered by the rook and Bxb6 cxb6 still loses it.
+        board = chess.Board("r3k3/B1p5/1p6/8/8/8/8/4K3 w - - 0 1")
+        assert material.see(_flip(board), chess.A7) == 3  # en prise before the move
+        assert material.left_en_prise(board, chess.Move.from_uci("e1d2"), 2) == []
+
+
+def _flip(board: chess.Board) -> chess.Board:
+    flipped = board.copy(stack=False)
+    flipped.push(chess.Move.null())
+    return flipped

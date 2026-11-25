@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 2 (motor de análisis y clasificación) — **implementada, pendiente de revisión** (2026-11-25):
-falta que el usuario revise la lista de fixtures reales y decida 3 reglas en disputa (abajo).
+Fase 2 (motor de análisis y clasificación) — **cerrada** (2026-11-25). Siguiente: Fase 3
+(interfaz de revisión): leer SPEC + ROADMAP + este archivo y proponer el plan.
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -78,26 +78,20 @@ falta que el usuario revise la lista de fixtures reales y decida 3 reglas en dis
   FastAPI: `progress`, `done`, `failed`), `GET .../review`. La revisión se recalcula en cada
   petición desde la caché (ajustar umbrales no exige reanalizar).
 - **CLI:** `make analyze PGN=…` imprime la tabla de jugadas clasificadas y el tiempo.
-- **Tests:** 167 rápidos (`make test`), integración con Stockfish real: fixtures reales a
-  profundidad 20 + aceptación (Byrne–Fischer, 82 medias jugadas, **11,2 s** con ajustes por
-  defecto vía API). `pytest tests/analysis` pasa (las 4 posiciones en disputa como xfail).
+- **Tests:** 172 rápidos (`make test`); integración con Stockfish real (~50 s): 14 fixtures
+  reales revisados por el usuario, a profundidad 16 + aceptación (Byrne–Fischer, 82 medias
+  jugadas, **11,2 s** con ajustes por defecto vía API). `pytest tests/analysis` pasa entero.
+- **Cierre (decisiones del usuario tras revisar los fixtures):** Teoría solo con Δ < 10;
+  sacrificio también con una pieza que ya estaba en prise si podía salvarse y no se hizo;
+  brillante con win% posterior ≥ 45; el mate en una nunca es "!". Profundidad de los fixtures
+  bajada a 16 (los 14 dan lo mismo que a 20, 4× más rápido).
 - Bugs encontrados y corregidos durante la fase: `POST /analysis` síncrono no podía crear la
   tarea (sin event loop); el 404 del SSE se lanzaba dentro del generador (demasiado tarde).
 
 ## Pendiente / siguiente paso
-- **Revisión de fixtures por el usuario** (`tests/fixtures/classification/real_positions.json`,
-  partidas en `tests/fixtures/games/`).
-- **Decisiones en disputa** (cada una con su fixture en xfail):
-  1. Libro con trampas: el dataset incluye "Barnes Opening: Fool's Mate", así que 2.g4?? sale
-     📖. Propuesta: una jugada de libro solo es Teoría si Δ < 10.
-  2. …Be6 (Byrne–Fischer): la dama ya estaba en prise antes y el motor no la come en su línea,
-     así que sale "!". Propuesta: contar también una pieza que ya estaba en prise si podía
-     ponerse a salvo y se deja.
-  3. 24.Rxd4 (Kasparov–Topalov): mejor jugada pero win% después 46,5 < 50 (regla 4) → "★".
-     Decidir umbral (p. ej. 45) o mantener 50.
-- Tras decidir: aplicar, quitar `disputed` de los fixtures y cerrar la Fase 2.
+- Fase 3: proponer plan y esperar OK.
 - La UI de juego no tiene tests de navegador reales (arrastrar y soltar, promoción): solo
-  Vitest + pruebas por API. Valorar tests E2E más adelante.
+  Vitest + pruebas por API. Valorar tests E2E más adelante (la Fase 3 añadirá más UI).
 
 ## Decisiones tomadas
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
@@ -143,8 +137,10 @@ falta que el usuario revise la lista de fixtures reales y decida 3 reglas en dis
   peor o de otra categoría (ganado > 75, perdido < 25). Momentos clave centrados en el usuario
   (errores por Δ ≥ 5, luego ! y !!; nunca jugadas del bot), con parámetro de perspectiva.
   Brillante: cualquier pieza propia que quede en prise (SEE, neto de lo capturado) y antes no lo
-  estuviera, o caída de material ≥ 2 en un horizonte de 6 medias jugadas (se extiende si hay un
-  intercambio en curso); se quitó "o mejora clara" de la regla 4 (no definible). Δ desde el
+  estuviera —o ya lo estuviera pero pudiera salvarse y no se hiciera—, o caída de material ≥ 2
+  en un horizonte de 6 medias jugadas (se extiende si hay un intercambio en curso); win%
+  posterior ≥ 45 (se quitó "o mejora clara", no definible). Teoría solo si Δ < 10 (el libro
+  contiene trampas). El mate en una nunca es gran jugada (★). Δ desde el
   MultiPV si la jugada está entre las líneas; si no, evaluación de la posición siguiente; Δ ≥ 0.
   Posiciones terminales sin motor. Valores por defecto: 0,5 s/posición, MultiPV 3, pool
   = núcleos − 1 (1–4), 1 hilo y 32 MB por motor.
@@ -168,8 +164,8 @@ falta que el usuario revise la lista de fixtures reales y decida 3 reglas en dis
 
 ## Deuda técnica / dudas abiertas
 - Elo de Principiante/Novato aproximado y sin calibrar.
-- La suite de integración tarda ~2,5 min por los fixtures a profundidad 20; bajar la
-  profundidad podría cambiar resultados. Valorar.
+- Fixture frágil: Kasparov 24.Rxd4 queda en ~46,3 % con umbral 45; otra versión de Stockfish
+  podría cambiarlo. Si un fixture cambia tras actualizar el motor, revisar con el usuario.
 - El libro tarda ~1,8 s en cargarse la primera vez (después queda en memoria).
 - SQLite se usa con sesión síncrona dentro de endpoints async: bloquea el event loop unos ms
   por petición. Aceptable para un solo usuario; revisar si molesta en la Fase 2 (SSE).

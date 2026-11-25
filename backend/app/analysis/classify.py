@@ -64,7 +64,7 @@ def classify(inp: MoveInput, t: ClassificationThresholds = THRESHOLDS) -> MoveVe
 def _classification(
     inp: MoveInput, wb: float, wa: float, delta: float, t: ClassificationThresholds
 ) -> Classification:
-    if inp.in_book:
+    if inp.in_book and delta < t.book_max_delta:
         return C.BOOK
     if (
         inp.previous in (C.MISTAKE, C.BLUNDER)
@@ -82,7 +82,7 @@ def _classification(
     ):
         return C.BRILLIANT
     best = is_best(inp)
-    if best and special and is_great(inp.before, t):
+    if best and special and not gives_mate(inp.board, inp.move) and is_great(inp.before, t):
         return C.GREAT
     if best or delta <= t.best_max_delta:
         return C.BEST
@@ -99,6 +99,13 @@ def _classification(
 
 def is_best(inp: MoveInput) -> bool:
     return bool(inp.before.lines) and inp.before.lines[0].move == inp.move.uci()
+
+
+def gives_mate(board: chess.Board, move: chess.Move) -> bool:
+    """Mate in one is never a great move: it is simply the best (SPEC §3.2)."""
+    after = board.copy(stack=False)
+    after.push(move)
+    return after.is_checkmate()
 
 
 def is_only_move(board: chess.Board) -> bool:
@@ -135,7 +142,7 @@ def is_great(before: PositionEval, t: ClassificationThresholds) -> bool:
 
 def is_sacrifice(inp: MoveInput, t: ClassificationThresholds) -> bool:
     """SPEC §3.1.2: material drops along the line, or a piece of ours is newly en prise."""
-    if material.newly_en_prise(inp.board, inp.move, t.sacrifice_min_material):
+    if material.left_en_prise(inp.board, inp.move, t.sacrifice_min_material):
         return True
     line = _played_line(inp)
     return _material_drop(inp.board, line, t.sacrifice_horizon_plies) >= t.sacrifice_min_material

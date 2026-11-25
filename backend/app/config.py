@@ -121,6 +121,9 @@ class ClassificationThresholds:
     mistake: float = 20.0
     # "Best" also covers moves whose Δ is at most this (another move as good as the top one).
     best_max_delta: float = 0.5
+    # A book move only counts as theory if it is not an error (Δ below this); the opening
+    # dataset also contains traps such as "Barnes Opening: Fool's Mate".
+    book_max_delta: float = 10.0
     # Great move (!): the second MultiPV option is at least this much worse...
     great_min_gap: float = 10.0
     # ...or falls into another outcome category (winning > winning_above, losing < losing_below).
@@ -129,7 +132,7 @@ class ClassificationThresholds:
     # Brilliant (!!).
     brilliant_max_delta: float = 2.0
     brilliant_max_win_before: float = 90.0  # exclusive: not already totally winning
-    brilliant_min_win_after: float = 50.0
+    brilliant_min_win_after: float = 45.0
     sacrifice_min_material: int = 2  # points (P=1, N=B=3, R=5, Q=9)
     sacrifice_horizon_plies: int = 6
     # Missed opportunity: after an opponent's ? / ??, Δ >= this and the best move reached

@@ -21,7 +21,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 GAMES_DIR = FIXTURES_DIR / "games"
 REAL_FIXTURES = FIXTURES_DIR / "classification" / "real_positions.json"
 # Fixed depth, one thread, MultiPV 3: reproducible for a given Stockfish build.
-FIXTURE_DEPTH = 20
+FIXTURE_DEPTH = 16  # same results as depth 20 for every fixture (checked 2026-11-25), 4x faster
 FIXTURE_MULTIPV = 3
 
 

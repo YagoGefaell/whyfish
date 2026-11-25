@@ -45,9 +45,14 @@ def inp(
 START = chess.STARTING_FEN
 
 
-def test_book_wins_over_everything() -> None:
+def test_book_move_is_theory() -> None:
+    verdict = classify(inp(START, "a2a3", ev(("e2e4", 0), ("a2a3", -100)), in_book=True))
+    assert verdict.classification is C.BOOK  # Δ 9.1 < 10
+
+
+def test_book_move_that_is_an_error_is_classified_normally() -> None:
     verdict = classify(inp(START, "a2a3", ev(("e2e4", 0), ("a2a3", -300)), in_book=True))
-    assert verdict.classification is C.BOOK
+    assert verdict.classification is C.BLUNDER  # Δ 25: a trap in the book is not theory
 
 
 @pytest.mark.parametrize(
@@ -100,6 +105,13 @@ class TestBestAndGreat:
     def test_not_great_with_a_single_line(self) -> None:
         assert classify(inp(START, "e2e4", ev(("e2e4", 0)))).classification is C.BEST
 
+    def test_mate_in_one_is_never_great(self) -> None:
+        # 1.f3 e5 2.g4 Qh4#: the second option is far worse, but mate in one is just best.
+        verdict = classify(
+            inp(START, "d8h4", ev(("d8h4", 0), ("b8c6", -300)), history=("f2f3", "e7e5", "g2g4"))
+        )
+        assert verdict.classification is C.BEST
+
     def test_only_legal_move_is_never_great(self) -> None:
         fen = "7k/8/8/8/8/8/6q1/7K w - - 0 1"  # Kxg2 is forced
         assert chess.Board(fen).legal_moves.count() == 1
@@ -146,8 +158,14 @@ class TestBrilliant:
         assert verdict.classification is C.BEST
 
     def test_not_when_the_result_is_bad(self) -> None:
-        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5", -30), ("d4e2", -40))))
+        # -60 cp = 44.5% < 45
+        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5", -60), ("d4e2", -70))))
         assert verdict.classification is C.BEST
+
+    def test_slightly_worse_but_balanced_result_is_enough(self) -> None:
+        # -20 cp = 48.2% >= 45
+        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5", -20), ("d4e2", -40))))
+        assert verdict.classification is C.BRILLIANT
 
     def test_not_when_it_loses_win_percentage(self) -> None:
         verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4e2", 50), ("d4f5", 0))))

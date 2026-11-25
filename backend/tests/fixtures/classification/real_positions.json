@@ -1,5 +1,5 @@
 {
-  "_comment": "Real positions classified with the real Stockfish at a fixed depth (tests/analysis/test_real_fixtures.py). `ply` is 0-based: move N by white = 2*(N-1), by black = 2*(N-1)+1. Entries with `disputed` hold the expected value if the pending rule change is accepted; they run as xfail. PENDING USER REVIEW.",
+  "_comment": "Real positions classified with the real Stockfish at a fixed depth (tests/analysis/test_real_fixtures.py). `ply` is 0-based: move N by white = 2*(N-1), by black = 2*(N-1)+1. Reviewed by the user on 2026-11-25.",
   "fixtures": [
     {
       "id": "opera-1-e4",
@@ -53,13 +53,13 @@
       "id": "opera-17-rd8",
       "pgn": "morphy_opera_1858.pgn",
       "ply": 32,
-      "expected": "great",
+      "expected": "best",
       "source": {
         "game": "Paul Morphy - Duke Karl / Count Isouard, Paris (Opera)",
         "year": 1858,
         "move": "17.Rd8#"
       },
-      "note": "Only move that does not lose after giving the queen."
+      "note": "Mate in one: never ! (SPEC 3.2), even though every other move loses."
     },
     {
       "id": "fischer-11-bg5",
@@ -107,8 +107,7 @@
         "year": 1956,
         "move": "17...Be6"
       },
-      "note": "Queen left en prise on b6; traditionally !!. Black stands at ~74% before the move (depth 20).",
-      "disputed": "With the current rules it is ! (great): the queen on b6 was already en prise before (Bc5 since move 16, SEE 6) and the engine's best line does not take it. Pending decision: also count a piece that was already en prise if it could have been saved and is left."
+      "note": "Queen left en prise on b6 (it was already attacked by Bc5 but could have been saved): sacrifice. Black at ~74% before the move. Traditionally !!."
     },
     {
       "id": "kasparov-24-rxd4",
@@ -120,8 +119,7 @@
         "year": 1999,
         "move": "24.Rxd4"
       },
-      "note": "Rook sacrifice (rook for pawn) in a balanced position; traditionally !!.",
-      "disputed": "With the current rules it is best: win% after = 46.5 < 50 (SPEC 3.1 rule 4). Pending decision on that threshold."
+      "note": "Rook sacrifice (rook for pawn); white stays at ~46.5%, above the 45% threshold (SPEC 3.1 rule 4). Traditionally !!."
     },
     {
       "id": "reti-1-kg7",
@@ -145,8 +143,7 @@
         "year": null,
         "move": "2.g4"
       },
-      "note": "Allows mate in one.",
-      "disputed": "With the current rules it is book: the Lichess dataset contains 'Barnes Opening: Fool's Mate'. Pending decision: a book move is only theory if it is not an error (Δ < 10)."
+      "note": "In the book ('Barnes Opening: Fool's Mate') but allows mate in one: a book move with Δ >= 10 is not theory."
     },
     {
       "id": "fools-2-qh4",
@@ -170,8 +167,7 @@
         "year": null,
         "move": "2...d5"
       },
-      "note": "After 2.g4?? black misses Qh4#.",
-      "disputed": "Depends on 2.g4 being classified as a blunder instead of book (see fools-2-g4)."
+      "note": "After 2.g4?? black misses Qh4#."
     }
   ]
 }
