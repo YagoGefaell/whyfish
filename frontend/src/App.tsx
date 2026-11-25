@@ -26,7 +26,7 @@ export default function App() {
 
   return (
     <main className="mx-auto max-w-xl p-8 font-sans">
-      <h1 className="mb-4 text-3xl font-bold">Chess Coach</h1>
+      <h1 className="mb-4 text-3xl font-bold">whyfish</h1>
       <EngineStatus state={state} />
     </main>
   )

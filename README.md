@@ -1,4 +1,4 @@
-# Chess Coach (whyfish)
+# whyfish
 
 Aplicación web local para jugar al ajedrez contra Stockfish y aprender de cada partida:
 al terminar, la app analiza la partida, clasifica cada jugada (??, ?, ?!, !, !!) y explica

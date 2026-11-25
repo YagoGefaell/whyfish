@@ -1,4 +1,4 @@
-# Especificación — Chess Coach
+# Especificación — whyfish
 
 ## 1. Flujos de usuario
 

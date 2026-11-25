@@ -1,4 +1,4 @@
-# Chess Coach — contexto para Claude Code
+# whyfish — contexto para Claude Code
 
 ## Qué es este proyecto
 Aplicación web local para **jugar al ajedrez contra Stockfish y aprender de cada partida**.

@@ -38,6 +38,9 @@ class StockfishEngine:
         self._transport = transport
         self._protocol = protocol
         self._settings = settings
+        # A UCI engine handles one command at a time; python-chess cancels the in-flight
+        # command if a second one is sent concurrently. Every command goes through this lock.
+        self._lock = asyncio.Lock()
 
     @classmethod
     async def start(cls, settings: Settings) -> "StockfishEngine":
@@ -73,10 +76,14 @@ class StockfishEngine:
     async def ping(self) -> None:
         try:
             await asyncio.wait_for(
-                self._protocol.ping(), timeout=self._settings.engine_ping_timeout_s
+                self._locked_ping(), timeout=self._settings.engine_ping_timeout_s
             )
         except (TimeoutError, chess.engine.EngineError) as exc:
             raise EngineUnavailableError(f"Engine not responding: {exc!r}") from exc
+
+    async def _locked_ping(self) -> None:
+        async with self._lock:
+            await self._protocol.ping()
 
     async def close(self) -> None:
         # The process may already be dead, e.g. Ctrl-C in `make dev` sends SIGINT to the whole

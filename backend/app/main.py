@@ -36,7 +36,7 @@ def create_app(
             if engine_state.engine is not None:
                 await engine_state.engine.close()
 
-    app = FastAPI(title="Chess Coach", lifespan=lifespan)
+    app = FastAPI(title="whyfish", lifespan=lifespan)
     app.include_router(health.router)
     return app
 

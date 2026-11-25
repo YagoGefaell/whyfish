@@ -1,5 +1,7 @@
 """Tests against the real Stockfish binary. Skipped if STOCKFISH_PATH is not usable."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,6 +24,16 @@ async def test_start_ping_and_close() -> None:
     engine = await StockfishEngine.start(_settings)
     try:
         assert engine.name.startswith("Stockfish")
+        await engine.ping()
+    finally:
+        await engine.close()
+
+
+async def test_concurrent_pings_do_not_interfere() -> None:
+    # Regression: concurrent /health requests used to cancel each other's ping.
+    engine = await StockfishEngine.start(_settings)
+    try:
+        await asyncio.gather(*(engine.ping() for _ in range(5)))
         await engine.ping()
     finally:
         await engine.close()

@@ -15,7 +15,7 @@ Fase 0 — **completada** (2026-11-25). Siguiente: Fase 1 (jugar contra el bot).
   (`Engine` Protocol + `StockfishEngine`: arranque con timeout, `Threads`/`Hash`, ping,
   cierre limpio incluso si el proceso ya murió); `GET /health` → 200 con nombre/versión o
   503 con el motivo. ruff + `mypy --strict` limpios.
-- **Tests backend:** 5 unitarios con `FakeEngine` + 3 de integración con Stockfish real
+- **Tests backend:** 5 unitarios con `FakeEngine` + 4 de integración con Stockfish real
   (marcador `stockfish`, se saltan si falta el binario).
 - **Frontend** (`frontend/`, pnpm): Vite + React 19 + TS `strict`, Tailwind v4, ESLint
   (typescript-eslint strictTypeChecked) + Prettier, Vitest + Testing Library. Página mínima
@@ -23,6 +23,10 @@ Fase 0 — **completada** (2026-11-25). Siguiente: Fase 1 (jugar contra el bot).
 - `Makefile`: `install`, `dev`, `test`, `lint`, `fmt`, `help`. `.env.example`.
 - Aceptación verificada: `make dev` levanta ambos; `/health` y `/api/health` devuelven
   `Stockfish 19`; `make test` y `make lint` pasan; Ctrl-C cierra motor y servidores sin errores.
+- **Fix post-cierre:** pings concurrentes a `/health` (StrictMode de React duplica el fetch en dev)
+  se cancelaban entre sí en python-chess → 500/503. Ahora `StockfishEngine` serializa todos los
+  comandos UCI con un `asyncio.Lock`. Test de regresión con 5 pings concurrentes.
+- Proyecto renombrado a **whyfish** (README, CLAUDE.md, SPEC, títulos, nombres de paquete).
 
 ## Pendiente / siguiente paso
 - Fase 1: plan a proponer (tablero, partidas, niveles, SQLite/SQLModel, PGN, deshacer, pista).
@@ -42,6 +46,8 @@ Fase 0 — **completada** (2026-11-25). Siguiente: Fase 1 (jugar contra el bot).
 - **Fase 0:** un solo motor (pool en Fase 2); si Stockfish no arranca, la API arranca y
   `/health` devuelve 503; rutas backend sin prefijo y Vite redirige `/api/*` quitando el prefijo;
   `make test` = pytest + Vitest, tests de integración con Stockfish se saltan si falta el binario.
+- **Un comando UCI a la vez por motor:** todo acceso al motor pasa por el lock de
+  `StockfishEngine`. Cualquier método nuevo (jugar, analizar) debe respetarlo.
 - **Paquete de ajedrez:** se usa `chess` (nombre actual en PyPI); `python-chess` 1.999 es
   solo un alias de transición.
 - **ESLint en vez de oxlint:** la plantilla actual de Vite trae oxlint; se sustituye por
@@ -54,4 +60,9 @@ Fase 0 — **completada** (2026-11-25). Siguiente: Fase 1 (jugar contra el bot).
 - Starlette avisa de que `httpx` está deprecado para `TestClient` en favor de `httpx2`.
   Cambio pendiente (en esta sesión no se aplicó); de momento solo es un warning.
 - Revisar la subida a TypeScript 7 cuando typescript-eslint lo soporte.
+- `/health` hace ping a través del lock: cuando el motor esté ocupado con una búsqueda larga
+  (Fase 1/2), el healthcheck esperará y puede dar 503 por timeout. Decidir en Fase 1 (p. ej.
+  comprobar solo que el proceso vive si el lock está ocupado, o motor dedicado por uso).
+- Si un ping vence por timeout, python-chess cancela el comando y el protocolo puede quedar
+  inconsistente; hoy se reporta 503, pero no hay reinicio automático del motor.
 - Con `--reload`, cada recarga del backend reinicia Stockfish (aceptable en dev).
