@@ -84,6 +84,8 @@ for (const dpr of [1, 2]) {
     expect(Math.abs(c.x - d4.x)).toBeLessThanOrEqual(1)
     expect(Math.abs(c.y - d4.y)).toBeLessThanOrEqual(1)
     await page.screenshot({ path: `e2e-artifacts/board-drag-dpr${String(dpr)}.png`, clip })
+    // The ghost left on the origin square is faint, as on Lichess.
+    await expect(page.locator('#play-board-square-e2 [data-piece]')).toHaveCSS('opacity', '0.3')
 
     // Drop back on its own square: no move is made.
     await page.mouse.move(from.x, from.y, { steps: 4 })

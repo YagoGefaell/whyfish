@@ -25,6 +25,7 @@ const BOARD_PIECES: PieceRenderObject = Object.fromEntries(
 export const BOARD_COLORS: {
   pieces: PieceRenderObject
   draggingPieceStyle: CSSProperties
+  draggingPieceGhostStyle: CSSProperties
   darkSquareStyle: CSSProperties
   lightSquareStyle: CSSProperties
   darkSquareNotationStyle: CSSProperties
@@ -36,6 +37,8 @@ export const BOARD_COLORS: {
   pieces: BOARD_PIECES,
   // The library scales the dragged piece by 1.2; keep it the size it has at rest.
   draggingPieceStyle: { transform: 'none' },
+  // The piece left behind on the origin square while dragging, as faint as on Lichess.
+  draggingPieceGhostStyle: { opacity: 0.3 },
   darkSquareStyle: { backgroundColor: '#739552' },
   lightSquareStyle: { backgroundColor: '#ebecd0' },
   darkSquareNotationStyle: { color: '#ebecd0', fontWeight: 600 },

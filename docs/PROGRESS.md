@@ -143,7 +143,7 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
   el contenido de la casilla (`SQUARE_CONTENT`, en ambos `squareRenderer`) va fijado a sus bordes
   como grid estirado. Las coordenadas llevan `z-index` para seguir por encima de las piezas.
 - **Arrastre:** sin el `scale(1.2)` por defecto de la librería; mismo tamaño que en reposo y el
-  cursor en el centro (`snapCenterToCursor`). Fantasma en origen con la opacidad por defecto (0,5).
+  cursor en el centro (`snapCenterToCursor`). Fantasma en origen con opacidad 0,3, como Lichess.
 - Los SVG llevan ahora `viewBox="0 0 45 45"` (anotado en su LICENSE.md).
 - **e2e `board.spec.ts`** (solo en el proyecto desktop-1920, contextos con DPR 1 y 2): la pieza
   coincide con la casilla al píxel, la arrastrada mide lo mismo y queda centrada en el cursor,
