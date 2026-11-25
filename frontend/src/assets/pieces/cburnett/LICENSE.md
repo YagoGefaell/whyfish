@@ -2,7 +2,8 @@
 
 SVG chess pieces by **Colin M.L. Burnett** ([User:Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett)),
 from Wikimedia Commons (`File:Chess_{k,q,r,b,n,p}{l,d}t45.svg`, downloaded 2026-11-25).
-Files renamed to `wK.svg` … `bP.svg`; content unchanged.
+Files renamed to `wK.svg` … `bP.svg`; the only change is a `viewBox="0 0 45 45"` on the root
+`<svg>` so they scale to any size without relying on the browser synthesising one.
 
 The author released them under a choice of GFDL, BSD or GPL (and CC BY-SA 3.0 through license
 migration). **whyfish uses them under the BSD license**:

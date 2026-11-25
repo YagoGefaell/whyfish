@@ -13,6 +13,3 @@ import wR from '../../assets/pieces/cburnett/wR.svg'
 
 /** cburnett piece set (BSD, see assets/pieces/cburnett/LICENSE.md). Keys: "wK", "bP"... */
 export const PIECE_URLS: Record<string, string> = { wK, wQ, wR, wB, wN, wP, bK, bQ, bR, bB, bN, bP }
-
-/** Share of the square taken by a piece on the board. */
-export const PIECE_SCALE = '85%'

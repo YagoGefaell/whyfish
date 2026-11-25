@@ -34,12 +34,10 @@ export function PromotionDialog({ color, onSelect, onCancel }: Props) {
               onClick={() => {
                 onSelect(piece)
               }}
-              className="h-16 w-16 rounded-lg border border-line bg-panel-2 flex items-center justify-center text-fg hover:bg-[#45423e]"
+              className="h-16 w-16 rounded-lg border border-line bg-panel-2 text-fg hover:bg-[#45423e]"
             >
-              <PieceImage
-                code={(color === 'white' ? 'w' : 'b') + code}
-                className="h-[85%] w-[85%]"
-              />
+              {/* Same piece as on the board: it fills the button like a square. */}
+              <PieceImage code={(color === 'white' ? 'w' : 'b') + code} />
             </button>
           ))}
         </div>

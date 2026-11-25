@@ -116,8 +116,8 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - **Iconos:** `ClassBadge` (insignias SVG propias, color fijo por categoría), `lucide-react` para
   la interfaz; sin emojis en toda la app.
 - **Piezas:** set cburnett de Wikimedia Commons (Colin M.L. Burnett), usado bajo **BSD** de su
-  licencia triple; aviso en `frontend/src/assets/pieces/cburnett/LICENSE.md`. Al 85 % de la
-  casilla; también en el tablero de juego y en la coronación.
+  licencia triple; aviso en `frontend/src/assets/pieces/cburnett/LICENSE.md`. Ajustadas antes
+  de la Fase 4 (ver abajo).
 - **Revisión:** Resumen primero (posición final en el tablero, precisión, tabla de categorías
   con la columna del usuario destacada, momentos clave, "Empezar revisión"); panel con la
   gráfica arriba, pestañas, coach (insignia + "4… Bxf3 es una imprecisión", explicación
@@ -133,6 +133,23 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - **Cabecera de la app:** sin "Motor listo"; aviso discreto solo si el motor no responde.
 - **Tests:** frontend 45 (Vitest); e2e en 1920×1080, 1366×768 y Pixel 7 con capturas y
   comprobaciones de tamaño y centrado.
+
+### Ajuste del tablero (antes de la Fase 4)
+- **Piezas al 100 % de la casilla**, sin escalado (el SVG trae su margen, como Lichess /
+  chessground: pieza de 12,5 % con `background-size: cover`). Un solo componente `PieceImage`
+  para la casilla, la pieza arrastrada y el diálogo de coronación.
+- **Causa del descentrado:** react-chessboard mete la pieza en un div sin tamaño dentro de una
+  casilla flex; el 100 % se resolvía contra el contenido y la pieza quedaba pegada arriba. Ahora
+  el contenido de la casilla (`SQUARE_CONTENT`, en ambos `squareRenderer`) va fijado a sus bordes
+  como grid estirado. Las coordenadas llevan `z-index` para seguir por encima de las piezas.
+- **Arrastre:** sin el `scale(1.2)` por defecto de la librería; mismo tamaño que en reposo y el
+  cursor en el centro (`snapCenterToCursor`). Fantasma en origen con la opacidad por defecto (0,5).
+- Los SVG llevan ahora `viewBox="0 0 45 45"` (anotado en su LICENSE.md).
+- **e2e `board.spec.ts`** (solo en el proyecto desktop-1920, contextos con DPR 1 y 2): la pieza
+  coincide con la casilla al píxel, la arrastrada mide lo mismo y queda centrada en el cursor,
+  y el diálogo de coronación muestra la pieza centrada llenando el botón. Recortes 4×4 en
+  `frontend/e2e-artifacts/board-*.png`. Lichess bloquea navegadores headless (Cloudflare), así
+  que la comparación se hizo contra el CSS de chessground.
 
 ## Pendiente / siguiente paso
 - Fase 4: proponer plan y esperar OK. `MoveExplanation` es el hueco a rellenar; la fila de

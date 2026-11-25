@@ -9,7 +9,7 @@ import {
 import type { Classification } from '../../api/analysis'
 import type { Color } from '../../api/games'
 import { ClassBadge } from '../../components/ClassBadge'
-import { BOARD_COLORS } from '../../components/board/theme'
+import { BOARD_COLORS, SQUARE_CONTENT } from '../../components/board/theme'
 import { PromotionDialog } from '../../components/board/PromotionDialog'
 import { resolveDrop, type PromotionPiece } from '../../components/board/moves'
 import { CLASSIFICATIONS } from './classification'
@@ -66,7 +66,12 @@ export function ReviewBoard({ fen, orientation, arrows, shownMove, animate, onMo
 
   const badgeSquare = shownMove?.classification ? shownMove.to : null
   const squareRenderer = ({ square, children }: SquareHandlerArgs & { children?: ReactNode }) => (
-    <div style={{ width: '100%', height: '100%', position: 'relative', ...squareStyles[square] }}>
+    <div
+      style={{
+        ...SQUARE_CONTENT,
+        ...squareStyles[square],
+      }}
+    >
       {children}
       {badgeSquare === square && shownMove?.classification && (
         <span

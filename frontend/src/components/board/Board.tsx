@@ -1,9 +1,14 @@
-import { useMemo, useState, type CSSProperties } from 'react'
-import { Chessboard, type PieceDropHandlerArgs, type PieceHandlerArgs } from 'react-chessboard'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  Chessboard,
+  type PieceDropHandlerArgs,
+  type PieceHandlerArgs,
+  type SquareHandlerArgs,
+} from 'react-chessboard'
 import type { Color } from '../../api/games'
 import { checkedKingSquare, resolveDrop, type PromotionPiece } from './moves'
 import { PromotionDialog } from './PromotionDialog'
-import { BOARD_COLORS } from './theme'
+import { BOARD_COLORS, SQUARE_CONTENT } from './theme'
 
 const LAST_MOVE_STYLE: CSSProperties = { backgroundColor: 'rgba(255, 213, 79, 0.55)' }
 const HINT_STYLE: CSSProperties = { boxShadow: 'inset 0 0 0 4px rgba(37, 99, 235, 0.9)' }
@@ -47,6 +52,10 @@ export function Board({
     return styles
   }, [fen, lastMove, hintSquare])
 
+  const squareRenderer = ({ square, children }: SquareHandlerArgs & { children?: ReactNode }) => (
+    <div style={{ ...SQUARE_CONTENT, ...squareStyles[square] }}>{children}</div>
+  )
+
   const playerPrefix = playerColor === 'white' ? 'w' : 'b'
 
   const canDragPiece = ({ piece }: PieceHandlerArgs) =>
@@ -82,7 +91,7 @@ export function Board({
           allowDragging: interactive,
           canDragPiece,
           onPieceDrop,
-          squareStyles,
+          squareRenderer,
           allowDrawingArrows: true,
           ...BOARD_COLORS,
         }}
