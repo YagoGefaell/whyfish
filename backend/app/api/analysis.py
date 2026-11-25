@@ -2,11 +2,13 @@ from collections.abc import AsyncIterable
 from typing import Annotated, Literal
 
 import chess
+import chess.engine
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 
 from app.analysis.book import default_book
+from app.analysis.evaluate import Evaluation, EvaluationInputError, build_board, evaluate
 from app.analysis.review import GameReview, MoveReview, PlayerSummary, build_review
 from app.analysis.runner import (
     AnalysisEngineUnavailableError,
@@ -14,7 +16,10 @@ from app.analysis.runner import (
     AnalysisService,
 )
 from app.analysis.types import SYMBOLS, Classification
-from app.api.deps import get_game_repository
+from app.api.deps import get_game_repository, get_settings_dep
+from app.config import Settings
+from app.engine.pool import PoolManager
+from app.engine.stockfish import EngineUnavailableError
 from app.models.analysis import AnalysisJob, AnalysisStatus
 from app.play.rules import PlayerColor
 from app.play.service import GameNotFoundError, GameRepository, GameRuleError
@@ -133,6 +138,75 @@ class ReviewRead(BaseModel):
             moves=[MoveReviewRead.from_review(m) for m in r.moves],
             evals=[EvalRead(win=round(e.win, 1), cp=e.cp, mate=e.mate) for e in r.evals],
         )
+
+
+class EvaluateRequest(BaseModel):
+    """Evaluate the position reached from `fen` after `moves` (UCI). Also a coach tool."""
+
+    fen: str = chess.STARTING_FEN
+    moves: list[str] = []
+    multipv: int = 1
+
+
+class EvaluatedLineRead(BaseModel):
+    uci: list[str]
+    san: list[str]
+    cp: int | None  # side to move's point of view
+    mate: int | None
+    win: float
+
+
+class EvaluationRead(BaseModel):
+    fen: str
+    turn: PlayerColor
+    terminal: Literal["checkmate", "stalemate", "draw"] | None
+    lines: list[EvaluatedLineRead]  # best first
+    best_uci: str | None
+    best_san: str | None
+    white: EvalRead  # for the eval bar
+
+    @classmethod
+    def from_evaluation(cls, e: Evaluation) -> "EvaluationRead":
+        lines = [
+            EvaluatedLineRead(
+                uci=list(ln.uci), san=list(ln.san), cp=ln.cp, mate=ln.mate, win=round(ln.win, 1)
+            )
+            for ln in e.lines
+        ]
+        best = lines[0] if lines else None
+        return cls(
+            fen=e.fen,
+            turn=_color(e.turn),
+            terminal=e.terminal,
+            lines=lines,
+            best_uci=best.uci[0] if best and best.uci else None,
+            best_san=best.san[0] if best and best.san else None,
+            white=EvalRead(win=round(e.white_win, 1), cp=e.white_cp, mate=e.white_mate),
+        )
+
+
+def get_pools(request: Request) -> PoolManager:
+    pools: PoolManager = request.app.state.analysis_pools
+    return pools
+
+
+@router.post("/analysis/evaluate")
+async def evaluate_position(
+    body: EvaluateRequest,
+    pools: Annotated[PoolManager, Depends(get_pools)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> EvaluationRead:
+    try:
+        board = build_board(body.fen, body.moves)
+    except EvaluationInputError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    multipv = max(1, min(body.multipv, settings.evaluate_max_multipv))
+    limit = chess.engine.Limit(time=settings.evaluate_time_s)
+    try:
+        result = await evaluate(pools, board, limit, multipv, settings.evaluate_line_plies)
+    except EngineUnavailableError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    return EvaluationRead.from_evaluation(result)
 
 
 def _not_found() -> HTTPException:

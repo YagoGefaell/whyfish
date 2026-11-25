@@ -1,11 +1,18 @@
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import Engine as DbEngine
+from sqlalchemy import inspect
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import create_engine
 
 import app.models.analysis
 import app.models.game  # noqa: F401
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+# Schema of databases created before Alembic was introduced (phases 1-2, via create_all).
+BASELINE_REVISION = "0001"
 
 
 def make_db_engine(url: str) -> DbEngine:
@@ -20,6 +27,22 @@ def make_db_engine(url: str) -> DbEngine:
     return create_engine(url, connect_args=connect_args)
 
 
+def alembic_config() -> Config:
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
+    return config
+
+
 def init_db(engine: DbEngine) -> None:
-    # No migrations until the schema stabilises (see docs/PROGRESS.md).
-    SQLModel.metadata.create_all(engine)
+    """Bring the schema up to date with Alembic.
+
+    A database created before Alembic (tables but no `alembic_version`) is stamped with the
+    baseline revision first, so only the newer migrations run on it.
+    """
+    config = alembic_config()
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        tables = set(inspect(connection).get_table_names())
+        if "game" in tables and "alembic_version" not in tables:
+            command.stamp(config, BASELINE_REVISION)
+        command.upgrade(config, "head")

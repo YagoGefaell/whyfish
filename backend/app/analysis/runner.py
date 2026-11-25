@@ -18,7 +18,7 @@ from sqlmodel import Session, col, select
 from app.analysis.positions import GamePosition, game_positions
 from app.analysis.types import EngineLine, PositionEval
 from app.config import Settings
-from app.engine.pool import EngineFactory, EnginePool, open_pool
+from app.engine.pool import EnginePool, PoolManager
 from app.models.analysis import AnalysisJob, AnalysisStatus, PositionAnalysis
 from app.models.game import utcnow
 from app.play.service import GameRepository, GameRuleError
@@ -77,12 +77,12 @@ class AnalysisService:
         self,
         db_engine: DbEngine,
         settings: Settings,
-        engine_factory: EngineFactory,
+        pools: PoolManager,
         engine_name: Callable[[], str | None],
     ) -> None:
         self._db = db_engine
         self._settings = settings
-        self._factory = engine_factory
+        self._pools = pools
         self._engine_name = engine_name
         self._tasks: dict[int, asyncio.Task[None]] = {}
         self._one_at_a_time = asyncio.Lock()
@@ -210,7 +210,6 @@ class AnalysisService:
         await self._update(game_id, status=AnalysisStatus.RUNNING, done=done, total=len(todo))
 
         if missing:
-            size = max(1, min(self._settings.engine_pool_size, len(missing)))
 
             async def save(position: GamePosition, lines: tuple[EngineLine, ...]) -> None:
                 nonlocal done
@@ -227,7 +226,7 @@ class AnalysisService:
                 done += 1
                 await self._update(game_id, done=done)
 
-            async with open_pool(self._factory, self._settings, size) as pool:
+            async with self._pools.use() as pool:
                 await evaluate_positions(
                     missing,
                     pool,

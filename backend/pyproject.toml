@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "whyfish backend: play against Stockfish and learn from every game."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
     "chess>=1.11.2",
     "fastapi>=0.165.0",
     "pydantic-settings>=2.16.3",

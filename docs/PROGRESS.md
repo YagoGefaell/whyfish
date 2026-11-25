@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 2 (motor de análisis y clasificación) — **cerrada** (2026-11-25). Siguiente: Fase 3
-(interfaz de revisión): leer SPEC + ROADMAP + este archivo y proponer el plan.
+Fase 3 (interfaz de revisión) — **completada** (2026-11-25), pendiente de la prueba de
+aceptación del usuario (revisar una partida importada de principio a fin). Siguiente: Fase 4.
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -88,10 +88,31 @@ Fase 2 (motor de análisis y clasificación) — **cerrada** (2026-11-25). Sigui
 - Bugs encontrados y corregidos durante la fase: `POST /analysis` síncrono no podía crear la
   tarea (sin event loop); el 404 del SSE se lanzaba dentro del generador (demasiado tarde).
 
+### Fase 3 — Interfaz de revisión
+- **Migraciones con Alembic** (`backend/migrations/`): 0001 = esquema de las fases 1–2,
+  0002 = partidas importadas. `init_db` marca con 0001 una base sin `alembic_version` y migra.
+  Copia de seguridad previa en `data/backups/whyfish-2026-11-25-pre-alembic.db`; migración
+  probada sobre una copia (partida 1 intacta). La base real se migra al próximo arranque.
+- **Importar PGN:** `POST /api/games/import`, detección del color por `PLAYER_NAME`, 422
+  `color_required` con los nombres; partidas importadas analizables siempre y no jugables.
+- **Evaluación bajo demanda:** `POST /api/analysis/evaluate {fen, moves?, multipv?}` con el
+  pool de análisis, ahora compartido y persistente (`PoolManager`: se arranca al usarse y se
+  cierra tras `ANALYSIS_POOL_IDLE_S` sin uso). Respuesta solo con hechos (UCI, SAN, cp/mate,
+  win%), pensada como herramienta del coach (Fase 6).
+- **Frontend:** `/review/:id` (tablero con flechas e icono de clasificación en la casilla de
+  destino, barra de evaluación vertical/horizontal, gráfica SVG clicable, lista, detalle con
+  línea mejor y refutación clicables, hueco `MoveExplanation` con texto provisional, resumen y
+  momentos clave), exploración de variantes con evaluación (debounce 250 ms + abort), teclado
+  (← → Inicio Fin Esc), progreso del análisis por SSE, `/import`, botones "Analizar partida"
+  al terminar y en el Historial, diseño móvil con pestañas.
+- **Tests:** backend 203 rápidos + 24 integración; frontend 40 (Vitest); **e2e Playwright**
+  (`make test-e2e`, escritorio + Pixel 7) con capturas en `frontend/e2e-artifacts/`.
+- Bugs encontrados con el e2e: Playwright recarga el config en cada worker y borraba la base
+  de prueba en uso (ahora la ruta se fija una vez y se pasa por entorno).
+
 ## Pendiente / siguiente paso
-- Fase 3: proponer plan y esperar OK.
-- La UI de juego no tiene tests de navegador reales (arrastrar y soltar, promoción): solo
-  Vitest + pruebas por API. Valorar tests E2E más adelante (la Fase 3 añadirá más UI).
+- Aceptación de la Fase 3 por el usuario: importar un PGN y revisarlo de principio a fin.
+- Fase 4: proponer plan y esperar OK. `MoveExplanation` es el hueco a rellenar.
 
 ## Decisiones tomadas
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
@@ -147,6 +168,11 @@ Fase 2 (motor de análisis y clasificación) — **cerrada** (2026-11-25). Sigui
 - **Repeticiones (viable, hecho):** el motor recibe la posición raíz desde la última jugada
   irreversible + las jugadas reversibles (python-chess envía `position fen … moves …`); la
   clave de caché es esa misma información, así que la caché sigue siendo por posición.
+- **Fase 3:** Alembic ya (no esperar a la Fase 8); importar solo PGN; exploración CON
+  evaluación del motor (endpoint reutilizable por el coach); Playwright para e2e con capturas
+  en escritorio y móvil (Chromium, ~125 MB en `~/.cache/ms-playwright`). Pool de análisis
+  compartido por análisis y evaluaciones; un análisis en curso hace esperar a las
+  evaluaciones (cola de motores).
 - **Tests de integración aparte:** marcador `integration`, `make test-integration`, tiempos de
   búsqueda reducidos; `make test` no los ejecuta.
 - **Un comando UCI a la vez por motor:** todo acceso al motor pasa por el lock de
@@ -166,6 +192,9 @@ Fase 2 (motor de análisis y clasificación) — **cerrada** (2026-11-25). Sigui
 - Elo de Principiante/Novato aproximado y sin calibrar.
 - Fixture frágil: Kasparov 24.Rxd4 queda en ~46,3 % con umbral 45; otra versión de Stockfish
   podría cambiarlo. Si un fixture cambia tras actualizar el motor, revisar con el usuario.
+- Las evaluaciones de exploración esperan si hay un análisis en curso usando todos los motores.
+- Los tests rápidos del backend tardan ~13 s (cada app de prueba ejecuta las migraciones).
+- Cabeceras PGN en las partidas jugadas: el `Event` es "whyfish" y la `Date` la de creación.
 - El libro tarda ~1,8 s en cargarse la primera vez (después queda en memoria).
 - SQLite se usa con sesión síncrona dentro de endpoints async: bloquea el event loop unos ms
   por petición. Aceptable para un solo usuario; revisar si molesta en la Fase 2 (SSE).

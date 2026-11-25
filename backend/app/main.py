@@ -9,6 +9,7 @@ from app.analysis.runner import AnalysisService
 from app.api import analysis, games, health
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
+from app.engine.pool import PoolManager
 from app.engine.state import EngineState
 from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
 
@@ -47,15 +48,16 @@ def create_app(
         def engine_name() -> str | None:
             return engine_state.engine.name if engine_state.engine else None
 
-        analysis_service = AnalysisService(
-            db_engine, resolved_settings, analysis_engine_factory, engine_name
-        )
+        pools = PoolManager(analysis_engine_factory, resolved_settings)
+        app.state.analysis_pools = pools
+        analysis_service = AnalysisService(db_engine, resolved_settings, pools, engine_name)
         analysis_service.mark_interrupted()
         app.state.analysis_service = analysis_service
         try:
             yield
         finally:
             await analysis_service.shutdown()
+            await pools.close()
             if engine_state.engine is not None:
                 await engine_state.engine.close()
             db_engine.dispose()

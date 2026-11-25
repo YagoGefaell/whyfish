@@ -21,6 +21,7 @@ htmlcov/
 node_modules/
 .pnpm-store/
 frontend/dist/
+frontend/e2e-artifacts/
 *.tsbuildinfo
 .vite/
 npm-debug.log*

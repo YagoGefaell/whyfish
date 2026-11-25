@@ -1,0 +1,66 @@
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { defineConfig, devices } from '@playwright/test'
+
+/**
+ * End-to-end tests against the real backend and Stockfish (`make test-e2e`).
+ * Never touches data/whyfish.db or the `make dev` ports: own temporary database and ports.
+ * If a port is already in use the run fails instead of reusing whatever is there.
+ */
+const BACKEND_PORT = 8765
+const FRONTEND_PORT = 5180
+const ARTIFACTS = resolve(import.meta.dirname, 'e2e-artifacts')
+
+// Playwright loads this file again in every worker process. Pick the database once, in the
+// main process, and hand it to the workers through the environment: deleting or renaming it
+// from a worker would pull it from under the running backend.
+if (!process.env.WHYFISH_E2E_DB) {
+  mkdirSync(ARTIFACTS, { recursive: true })
+  for (const name of readdirSync(ARTIFACTS)) {
+    if (/^e2e-\d+\.db(-journal)?$/.test(name)) rmSync(resolve(ARTIFACTS, name), { force: true })
+  }
+  process.env.WHYFISH_E2E_DB = resolve(ARTIFACTS, `e2e-${String(Date.now())}.db`)
+}
+const DB = process.env.WHYFISH_E2E_DB
+
+export default defineConfig({
+  testDir: './e2e',
+  outputDir: resolve(ARTIFACTS, 'results'),
+  timeout: 120_000,
+  fullyParallel: false,
+  workers: 1,
+  reporter: 'list',
+  use: {
+    baseURL: `http://127.0.0.1:${String(FRONTEND_PORT)}`,
+    trace: 'retain-on-failure',
+  },
+  projects: [
+    {
+      name: 'desktop',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 } },
+    },
+    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+  ],
+  webServer: [
+    {
+      command: `uv run uvicorn app.main:app --host 127.0.0.1 --port ${String(BACKEND_PORT)}`,
+      cwd: resolve(import.meta.dirname, '../backend'),
+      env: {
+        DATABASE_URL: `sqlite:///${DB}`,
+        ANALYSIS_TIME_S: '0.05',
+        EVALUATE_TIME_S: '0.1',
+        BOT_MOVETIME_S: '0.05',
+      },
+      url: `http://127.0.0.1:${String(BACKEND_PORT)}/api/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      command: `pnpm exec vite --host 127.0.0.1 --port ${String(FRONTEND_PORT)} --strictPort`,
+      env: { BACKEND_URL: `http://127.0.0.1:${String(BACKEND_PORT)}` },
+      url: `http://127.0.0.1:${String(FRONTEND_PORT)}`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
+})

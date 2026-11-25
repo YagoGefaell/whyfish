@@ -4,6 +4,12 @@ export function gameState(overrides: Partial<GameState> = {}): GameState {
   return {
     id: 7,
     created_at: '2026-11-25T10:00:00Z',
+    source: 'played',
+    white_name: null,
+    black_name: null,
+    event: null,
+    played_date: null,
+    analysis_status: null,
     player_color: 'white',
     bot_level: 'club',
     bot_level_label: 'Club ~1500',

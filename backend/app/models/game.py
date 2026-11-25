@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from enum import StrEnum
 
 import chess
 from sqlmodel import Field, SQLModel
@@ -11,12 +12,24 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class GameSource(StrEnum):
+    PLAYED = "played"  # against the bot in this app
+    IMPORTED = "imported"  # from a PGN
+
+
 class Game(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=utcnow)
     ended_at: datetime | None = None
+    source: GameSource = GameSource.PLAYED
+    # The user's color (for imported games: chosen or detected by PLAYER_NAME).
     player_color: PlayerColor
-    bot_level: BotLevel
+    bot_level: BotLevel | None = None  # None for imported games
+    # PGN headers of imported games.
+    white_name: str | None = None
+    black_name: str | None = None
+    event: str | None = None
+    played_date: str | None = None  # PGN "Date" as written, e.g. "1858.11.02" or "1858.??.??"
     initial_fen: str = chess.STARTING_FEN
     allow_undo: bool = False
     allow_hint: bool = False

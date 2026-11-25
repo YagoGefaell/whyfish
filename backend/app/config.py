@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     analysis_multipv: int = 3
     analysis_threads: int = 1
     analysis_hash_mb: int = 32
+    # Close the analysis engines after this many idle seconds (frees memory on a Pi).
+    analysis_pool_idle_s: float = 120.0
+    # On-demand evaluation (exploring variations, coach tool): search time and line length.
+    evaluate_time_s: float = 0.3
+    evaluate_max_multipv: int = 5
+    evaluate_line_plies: int = 6
 
     # --- Storage ----------------------------------------------------------
     database_url: str = f"sqlite:///{REPO_ROOT / 'data' / 'whyfish.db'}"

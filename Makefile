@@ -1,6 +1,6 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration analyze \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze \
         lint lint-backend lint-frontend fmt
 
 help:
@@ -8,6 +8,7 @@ help:
 	@echo "make dev       Run backend (:$(BACKEND_PORT)) and frontend (Vite) together"
 	@echo "make test      Fast tests: pytest (fake engine) + Vitest"
 	@echo "make test-integration  Tests against the real Stockfish (reduced search times)"
+	@echo "make test-e2e  Browser tests (Playwright) on their own DB and ports; screenshots in frontend/e2e-artifacts/"
 	@echo "make analyze PGN=file.pgn  Analyse a PGN with Stockfish and print the review"
 	@echo "make lint      ruff + mypy --strict, ESLint + Prettier + tsc"
 	@echo "make fmt       Auto-format backend and frontend"
@@ -15,6 +16,7 @@ help:
 install:
 	cd backend && uv sync
 	cd frontend && pnpm install
+	@echo "For browser tests also run: make install-e2e"
 
 dev:
 	@$(MAKE) --no-print-directory -j2 dev-backend dev-frontend
@@ -35,6 +37,12 @@ test-integration:
 
 test-frontend:
 	cd frontend && pnpm test
+
+test-e2e:
+	cd frontend && pnpm exec playwright test
+
+install-e2e:
+	cd frontend && pnpm exec playwright install chromium
 
 analyze:
 	@test -n "$(PGN)" || (echo "Usage: make analyze PGN=path/to/game.pgn" && exit 1)

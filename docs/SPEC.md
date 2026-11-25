@@ -15,8 +15,12 @@
 - Al terminar: botón **"Analizar partida"**.
 
 ### 1.2 Importar
-- Pegar PGN o FEN, o (fase posterior) importar desde Lichess/Chess.com por usuario.
-- Mismo flujo de análisis que una partida jugada.
+- Pegar o subir un **PGN** (primera partida, línea principal; admite `[SetUp]`/`[FEN]`), o
+  (fase posterior) importar desde Lichess/Chess.com por usuario. Un FEN suelto no se importa:
+  para eso está "Nueva partida desde FEN".
+- El color del usuario se indica o se detecta comparando `PLAYER_NAME` con las cabeceras
+  `White`/`Black`; si no se puede, la app pregunta.
+- Mismo flujo de análisis que una partida jugada (las importadas siempre son analizables).
 
 ### 1.3 Revisión (Game Review)
 - Barra de evaluación + gráfica de evaluación a lo largo de la partida (clic → ir a jugada).
@@ -30,7 +34,13 @@
     la mejor jugada, conceptos implicados.
   - **Nivel 3 — "Pregunta al coach"**: chat sobre esa posición ("¿y si juego Nxe5?").
   - **"Pruébalo tú"**: en errores, repetir la posición e intentar encontrar la mejor jugada antes de verla.
-  - Explorar variantes en el tablero (salir de la línea de la partida y volver).
+  - Explorar variantes en el tablero (salir de la línea de la partida y volver), con
+    evaluación del motor (`POST /api/analysis/evaluate`, ~0,3 s, con debounce) en la barra y
+    flecha con la mejor jugada.
+- Navegación con ← → Inicio Fin, clic en la gráfica, en la lista y en los momentos clave.
+  Icono de la clasificación sobre la casilla de destino de la jugada seleccionada.
+- Diseño adaptable: en móvil, tablero a todo el ancho, barra de evaluación horizontal y el
+  resto en pestañas (Jugada / Jugadas / Resumen).
 
 ## 2. Análisis con motor
 - Por cada posición de la partida: evaluación con MultiPV = 3 a profundidad/tiempo
@@ -164,16 +174,20 @@ Registrar tokens usados por partida en logs.
 Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desarrollo y en producción.
 
 - `POST /games` crear partida (color, nivel) · `POST /games/{id}/moves` jugada del usuario → respuesta del motor
-- `POST /games/import` (PGN/FEN)
+- `POST /games/import` (`{pgn, user_color?}`; 422 `color_required` si no se puede deducir)
 - `POST /games/{id}/analysis` lanza análisis · `GET /games/{id}/analysis/stream` (SSE progreso)
 - `GET /games/{id}/review` resumen + jugadas clasificadas
+- `POST /analysis/evaluate` (`{fen, moves?, multipv?}`): evaluación bajo demanda con el pool de
+  análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada. Herramienta del coach (Fase 6).
 - `GET /games/{id}/moves/{ply}/explanation?level=1|2`
 - `POST /games/{id}/moves/{ply}/chat` (streaming)
 - `GET /games` historial
 
 ## 7. Persistencia
-SQLite: `Game`, `Move`, `PositionAnalysis` (cache por FEN+ajustes), `Explanation` (cache),
-`ChatMessage`. Migraciones simples (Alembic o recreación en dev, decidir en fase 1).
+SQLite: `Game`, `Move`, `AnalysisJob`, `PositionAnalysis` (caché por posición + historia
+reversible + ajustes), `Explanation` (caché), `ChatMessage`. Migraciones con **Alembic**
+(`backend/migrations/`), aplicadas al arrancar; una base anterior a Alembic se marca con la
+revisión base y se migra.
 
 ## 8. Fuera de alcance (por ahora)
 Multijugador, cuentas de usuario, exposición pública a internet, móvil nativo, entrenamiento de

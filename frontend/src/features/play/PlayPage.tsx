@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { gamesApi, type Color, type GameState } from '../../api/games'
 import { Board } from '../../components/board/Board'
 import { COLOR_LABEL, endText } from './gameText'
+import { AnalyzeButton } from './AnalyzeButton'
 import { MoveList } from './MoveList'
 import { usePlayGame, type PlayGame } from './usePlayGame'
 
@@ -26,6 +27,16 @@ function PlayGameView({ gameId }: { gameId: number }) {
   if (!play.game || !play.fen) return <p className="text-gray-500">Cargando partida…</p>
 
   const game = play.game
+  if (game.source === 'imported') {
+    return (
+      <p>
+        Esta partida es importada.{' '}
+        <Link className="text-blue-700 underline" to={`/review/${String(game.id)}`}>
+          Ver su revisión
+        </Link>
+      </p>
+    )
+  }
   const finished = game.status === 'finished'
   const playerTurn = !finished && game.turn === game.player_color
   const last = game.moves.at(-1)
@@ -156,6 +167,7 @@ function Controls({ play, game, onFlip }: { play: PlayGame; game: GameState; onF
       <a className={BUTTON} href={gamesApi.pgnUrl(game.id)} download>
         Descargar PGN
       </a>
+      {!ongoing && <AnalyzeButton game={game} />}
       {!ongoing && (
         <Link className={BUTTON} to="/">
           Nueva partida

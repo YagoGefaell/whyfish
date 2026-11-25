@@ -5,7 +5,8 @@ import chess
 from pydantic import BaseModel
 
 from app.config import LEVEL_PRESETS, BotLevel
-from app.models.game import Game
+from app.models.analysis import AnalysisStatus
+from app.models.game import Game, GameSource
 from app.play.rules import DrawDecline, PlayerColor, Termination
 from app.play.service import ColorChoice, LoadedGame
 
@@ -38,25 +39,39 @@ class MoveRead(BaseModel):
 class GameSummary(BaseModel):
     id: int
     created_at: datetime
+    source: GameSource
     player_color: PlayerColor
-    bot_level: BotLevel
-    bot_level_label: str
+    bot_level: BotLevel | None  # None for imported games
+    bot_level_label: str | None
+    white_name: str | None  # imported games
+    black_name: str | None
+    event: str | None
+    played_date: str | None
     result: str | None
     termination: Termination | None
     move_count: int
+    analysis_status: AnalysisStatus | None
 
     @classmethod
-    def from_game(cls, game: Game, move_count: int) -> "GameSummary":
+    def from_game(
+        cls, game: Game, move_count: int, analysis_status: AnalysisStatus | None
+    ) -> "GameSummary":
         assert game.id is not None
         return cls(
             id=game.id,
             created_at=game.created_at,
+            source=game.source,
             player_color=game.player_color,
             bot_level=game.bot_level,
-            bot_level_label=LEVEL_PRESETS[game.bot_level].label,
+            bot_level_label=LEVEL_PRESETS[game.bot_level].label if game.bot_level else None,
+            white_name=game.white_name,
+            black_name=game.black_name,
+            event=game.event,
+            played_date=game.played_date,
             result=game.result,
             termination=game.termination,
             move_count=move_count,
+            analysis_status=analysis_status,
         )
 
 
@@ -72,9 +87,11 @@ class GameState(GameSummary):
     hint_count: int
 
     @classmethod
-    def from_loaded(cls, loaded: LoadedGame) -> "GameState":
+    def from_loaded(
+        cls, loaded: LoadedGame, analysis_status: AnalysisStatus | None = None
+    ) -> "GameState":
         game = loaded.game
-        summary = GameSummary.from_game(game, len(loaded.moves))
+        summary = GameSummary.from_game(game, len(loaded.moves), analysis_status)
         return cls(
             **summary.model_dump(),
             status="finished" if game.is_over else "ongoing",
@@ -89,6 +106,17 @@ class GameState(GameSummary):
             undo_count=game.undo_count,
             hint_count=game.hint_count,
         )
+
+
+class GameImport(BaseModel):
+    pgn: str
+    # The user's side; if omitted it is detected from PLAYER_NAME in the PGN headers.
+    user_color: PlayerColor | None = None
+
+
+class GameImportRead(BaseModel):
+    game: GameState
+    warnings: list[str]
 
 
 class HintRead(BaseModel):

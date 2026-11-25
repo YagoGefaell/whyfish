@@ -26,15 +26,18 @@ const OUTCOME_TEXT: Record<PlayerOutcome, string> = {
   draw: 'Tablas',
 }
 
-export function outcomeShortText(result: GameResult | null, playerColor: Color): string {
-  return result === null ? 'En curso' : OUTCOME_TEXT[playerOutcome(result, playerColor)]
+export function outcomeShortText(result: GameResult | '*' | null, playerColor: Color): string {
+  if (result === null) return 'En curso'
+  if (result === '*') return 'Sin resultado'
+  return OUTCOME_TEXT[playerOutcome(result, playerColor)]
 }
 
 export function endText(
-  result: GameResult,
+  result: GameResult | '*',
   termination: Termination | null,
   playerColor: Color,
 ): string {
+  if (result === '*') return 'Partida sin resultado'
   const base = OUTCOME_TEXT[playerOutcome(result, playerColor)]
   return termination === null ? base : `${base} ${TERMINATION_TEXT[termination]}`
 }

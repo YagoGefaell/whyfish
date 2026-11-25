@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { gamesApi, type GameSummary } from '../../api/games'
+import { AnalyzeButton } from '../play/AnalyzeButton'
 import { COLOR_LABEL, outcomeShortText } from '../play/gameText'
+
+function title(g: GameSummary): string {
+  if (g.source === 'imported') {
+    return `${g.white_name ?? 'Blancas'} – ${g.black_name ?? 'Negras'}`
+  }
+  return `vs Stockfish (${g.bot_level_label ?? '?'})`
+}
 
 export function HistoryPage() {
   const [games, setGames] = useState<GameSummary[] | null>(null)
@@ -21,39 +29,62 @@ export function HistoryPage() {
   if (games.length === 0) {
     return (
       <p>
-        Aún no has jugado ninguna partida. <Link to="/">Empieza una</Link>.
+        Aún no hay partidas. <Link to="/">Juega una</Link> o{' '}
+        <Link to="/import">importa un PGN</Link>.
       </p>
     )
   }
 
   return (
-    <table className="w-full text-left text-sm">
-      <thead className="border-b text-gray-500">
-        <tr>
-          <th className="py-2">Fecha</th>
-          <th>Color</th>
-          <th>Nivel</th>
-          <th>Resultado</th>
-          <th>Jugadas</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        {games.map((g) => (
-          <tr key={g.id} className="border-b">
-            <td className="py-2">{new Date(g.created_at).toLocaleString('es-ES')}</td>
-            <td>{COLOR_LABEL[g.player_color]}</td>
-            <td>{g.bot_level_label}</td>
-            <td>{outcomeShortText(g.result, g.player_color)}</td>
-            <td>{Math.ceil(g.move_count / 2)}</td>
-            <td>
-              <Link className="text-blue-700 hover:underline" to={`/play/${String(g.id)}`}>
-                {g.result === null ? 'Continuar' : 'Ver'}
-              </Link>
-            </td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b text-gray-500">
+          <tr>
+            <th className="py-2">Fecha</th>
+            <th>Partida</th>
+            <th>Tu color</th>
+            <th>Resultado</th>
+            <th>Jugadas</th>
+            <th>Revisión</th>
+            <th />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {games.map((g) => {
+            const ongoing = g.result === null
+            return (
+              <tr key={g.id} className="border-b">
+                <td className="py-2">{new Date(g.created_at).toLocaleString('es-ES')}</td>
+                <td>
+                  {title(g)}
+                  {g.source === 'imported' && (
+                    <span className="ml-2 rounded bg-gray-100 px-1 text-xs text-gray-600">
+                      importada
+                    </span>
+                  )}
+                </td>
+                <td>{COLOR_LABEL[g.player_color]}</td>
+                <td>{outcomeShortText(g.result, g.player_color)}</td>
+                <td>{Math.ceil(g.move_count / 2)}</td>
+                <td>
+                  {ongoing ? (
+                    <span className="text-gray-400">—</span>
+                  ) : (
+                    <AnalyzeButton game={g} compact />
+                  )}
+                </td>
+                <td>
+                  {g.source === 'played' && (
+                    <Link className="text-blue-700 hover:underline" to={`/play/${String(g.id)}`}>
+                      {ongoing ? 'Continuar' : 'Ver partida'}
+                    </Link>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }

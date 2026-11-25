@@ -25,15 +25,26 @@ export interface MoveRecord {
   by_bot: boolean
 }
 
+export type GameSource = 'played' | 'imported'
+export type AnalysisStatus = 'pending' | 'running' | 'done' | 'failed'
+
 export interface GameSummary {
   id: number
   created_at: string
+  source: GameSource
+  /** The user's color (for imported games: chosen or detected). */
   player_color: Color
-  bot_level: BotLevel
-  bot_level_label: string
-  result: GameResult | null
+  bot_level: BotLevel | null
+  bot_level_label: string | null
+  white_name: string | null
+  black_name: string | null
+  event: string | null
+  played_date: string | null
+  /** '*' = unknown result of an imported game. */
+  result: GameResult | '*' | null
   termination: Termination | null
   move_count: number
+  analysis_status: AnalysisStatus | null
 }
 
 export interface GameState extends GameSummary {
@@ -64,6 +75,11 @@ export interface DrawOffer {
   game: GameState
 }
 
+export interface ImportResult {
+  game: GameState
+  warnings: string[]
+}
+
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 
@@ -77,5 +93,7 @@ export const gamesApi = {
   hint: (id: number) => post<{ square: string }>(`/games/${String(id)}/hint`),
   resign: (id: number) => post<GameState>(`/games/${String(id)}/resign`),
   offerDraw: (id: number) => post<DrawOffer>(`/games/${String(id)}/draw`),
+  importPgn: (pgn: string, userColor: Color | null) =>
+    post<ImportResult>('/games/import', { pgn, user_color: userColor }),
   pgnUrl: (id: number) => `/api/games/${String(id)}/pgn`,
 }

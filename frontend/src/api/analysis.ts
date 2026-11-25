@@ -1,0 +1,99 @@
+import { request } from './client'
+import type { AnalysisStatus, Color } from './games'
+
+export type Classification =
+  | 'book'
+  | 'brilliant'
+  | 'great'
+  | 'best'
+  | 'excellent'
+  | 'good'
+  | 'inaccuracy'
+  | 'mistake'
+  | 'blunder'
+  | 'miss'
+
+export interface AnalysisJob {
+  game_id: number
+  status: AnalysisStatus
+  done: number
+  total: number
+  error: string | null
+}
+
+/** Evaluation from white's point of view. */
+export interface WhiteEval {
+  win: number
+  cp: number | null
+  mate: number | null
+}
+
+export interface MoveReview {
+  ply: number
+  color: Color
+  uci: string
+  san: string
+  classification: Classification
+  symbol: string
+  win_before: number
+  win_after: number
+  delta: number
+  accuracy: number
+  best_uci: string | null
+  best_san: string | null
+  /** SAN from the position before the move. */
+  best_line: string[]
+  /** SAN from the position after the move: the engine's continuation. */
+  played_line: string[]
+}
+
+export interface PlayerSummary {
+  accuracy: number | null
+  counts: Record<Classification, number>
+}
+
+export interface Review {
+  game_id: number
+  perspective: Color
+  opening: { eco: string; name: string } | null
+  white: PlayerSummary
+  black: PlayerSummary
+  key_moments: number[]
+  moves: MoveReview[]
+  /** One per position: start + after each move. */
+  evals: WhiteEval[]
+}
+
+export interface EvaluatedLine {
+  uci: string[]
+  san: string[]
+  cp: number | null
+  mate: number | null
+  win: number
+}
+
+export interface Evaluation {
+  fen: string
+  turn: Color
+  terminal: 'checkmate' | 'stalemate' | 'draw' | null
+  lines: EvaluatedLine[]
+  best_uci: string | null
+  best_san: string | null
+  white: WhiteEval
+}
+
+const post = <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+  request<T>(path, {
+    method: 'POST',
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  })
+
+export const analysisApi = {
+  start: (gameId: number) => post<AnalysisJob>(`/games/${String(gameId)}/analysis`),
+  status: (gameId: number) => request<AnalysisJob>(`/games/${String(gameId)}/analysis`),
+  review: (gameId: number) => request<Review>(`/games/${String(gameId)}/review`),
+  streamUrl: (gameId: number) => `/api/games/${String(gameId)}/analysis/stream`,
+  evaluate: (fen: string, moves: string[], signal?: AbortSignal) =>
+    post<Evaluation>('/analysis/evaluate', { fen, moves }, signal),
+}

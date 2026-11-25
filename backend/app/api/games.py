@@ -9,6 +9,8 @@ from app.api.deps import get_game_lock, get_game_repository, get_game_service, g
 from app.api.schemas import (
     DrawOfferRead,
     GameCreate,
+    GameImport,
+    GameImportRead,
     GameState,
     GameSummary,
     HintRead,
@@ -17,6 +19,7 @@ from app.api.schemas import (
 )
 from app.config import LEVEL_PRESETS, Settings
 from app.engine.stockfish import EngineUnavailableError
+from app.play.pgn import PgnImportError, detect_user_color, parse_pgn
 from app.play.rules import IllegalMoveError, InvalidFenError
 from app.play.service import (
     GameNotFoundError,
@@ -24,6 +27,7 @@ from app.play.service import (
     GameRuleError,
     GameService,
     game_pgn,
+    import_game,
 )
 
 router = APIRouter()
@@ -63,7 +67,40 @@ def list_levels() -> list[LevelRead]:
 
 @router.get("/games")
 def list_games(repo: Repo) -> list[GameSummary]:
-    return [GameSummary.from_game(game, count) for game, count in repo.list_with_move_counts()]
+    statuses = repo.analysis_statuses()
+    return [
+        GameSummary.from_game(game, count, statuses.get(game.id or 0))
+        for game, count in repo.list_with_move_counts()
+    ]
+
+
+@router.post("/games/import", status_code=status.HTTP_201_CREATED)
+def import_pgn(
+    body: GameImport, repo: Repo, settings: Annotated[Settings, Depends(get_settings_dep)]
+) -> GameImportRead:
+    try:
+        parsed = parse_pgn(body.pgn)
+    except PgnImportError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    user_color = body.user_color or detect_user_color(parsed, settings.player_name)
+    if user_color is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            {
+                "code": "color_required",
+                "message": "No se pudo deducir qué color jugaste. Indícalo.",
+                "white": parsed.white,
+                "black": parsed.black,
+            },
+        )
+    warnings = []
+    if parsed.games_in_text > 1:
+        warnings.append(
+            f"El PGN contiene {parsed.games_in_text} partidas; solo se ha importado la primera."
+        )
+    return GameImportRead(
+        game=GameState.from_loaded(import_game(repo, parsed, user_color)), warnings=warnings
+    )
 
 
 @router.post("/games", status_code=status.HTTP_201_CREATED)
@@ -81,7 +118,7 @@ async def create_game(body: GameCreate, service: Service, lock: Lock) -> GameSta
 @router.get("/games/{game_id}")
 def get_game(game_id: int, repo: Repo) -> GameState:
     try:
-        return GameState.from_loaded(repo.load(game_id))
+        return GameState.from_loaded(repo.load(game_id), repo.analysis_status(game_id))
     except _ERRORS as exc:
         raise _http_error(exc) from exc
 

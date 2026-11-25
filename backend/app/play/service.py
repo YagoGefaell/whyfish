@@ -15,8 +15,10 @@ from sqlmodel import Session, col, func, select
 
 from app.config import LEVEL_PRESETS, BotLevel, Settings
 from app.engine.stockfish import Engine
-from app.models.game import Game, Move, utcnow
+from app.models.analysis import AnalysisJob, AnalysisStatus
+from app.models.game import Game, GameSource, Move, utcnow
 from app.play import rules
+from app.play.pgn import ParsedPgn, pgn_result
 from app.play.rules import DrawDecline, Outcome, PlayerColor
 
 
@@ -70,6 +72,14 @@ class GameRepository:
         ).all()
         return [(game, count) for game, count in rows]
 
+    def analysis_statuses(self) -> dict[int, AnalysisStatus]:
+        jobs = self._session.exec(select(AnalysisJob)).all()
+        return {job.game_id: job.status for job in jobs}
+
+    def analysis_status(self, game_id: int) -> AnalysisStatus | None:
+        job = self._session.exec(select(AnalysisJob).where(AnalysisJob.game_id == game_id)).first()
+        return job.status if job else None
+
     def save(self, game: Game, new_moves: Sequence[Move] = ()) -> None:
         self._session.add(game)
         self._session.flush()  # assigns game.id on creation
@@ -86,11 +96,20 @@ class GameRepository:
 
 def game_pgn(loaded: LoadedGame, player_name: str) -> str:
     game = loaded.game
-    bot_name = f"Stockfish ({LEVEL_PRESETS[game.bot_level].label})"
-    if game.player_color is PlayerColor.WHITE:
-        white, black = player_name, bot_name
+    if game.source is GameSource.IMPORTED:
+        white, black = game.white_name or "?", game.black_name or "?"
     else:
-        white, black = bot_name, player_name
+        level = LEVEL_PRESETS[game.bot_level].label if game.bot_level else "?"
+        bot_name = f"Stockfish ({level})"
+        if game.player_color is PlayerColor.WHITE:
+            white, black = player_name, bot_name
+        else:
+            white, black = bot_name, player_name
+    extra = {}
+    if game.event:
+        extra["Event"] = game.event
+    if game.played_date:
+        extra["Date"] = game.played_date
     return rules.build_pgn(
         rules.PgnData(
             white=white,
@@ -101,8 +120,36 @@ def game_pgn(loaded: LoadedGame, player_name: str) -> str:
             result=game.result,
             undo_count=game.undo_count,
             hint_count=game.hint_count,
+            extra_headers=extra,
         )
     )
+
+
+def import_game(repo: GameRepository, parsed: ParsedPgn, user_color: PlayerColor) -> LoadedGame:
+    """Store an imported game. "Bot" moves are the opponent's (the side the user did not play)."""
+    board = chess.Board(parsed.initial_fen)
+    moves: list[Move] = []
+    for uci in parsed.ucis:
+        mover = board.turn
+        moves.append(
+            _record(board, chess.Move.from_uci(uci), by_bot=mover != user_color.chess_color)
+        )
+    outcome = rules.game_outcome(board)
+    game = Game(
+        source=GameSource.IMPORTED,
+        player_color=user_color,
+        initial_fen=parsed.initial_fen,
+        white_name=parsed.white,
+        black_name=parsed.black,
+        event=parsed.event,
+        played_date=parsed.date,
+        result=pgn_result(parsed, board),
+        termination=outcome.termination if outcome else None,
+        ended_at=utcnow(),
+    )
+    repo.save(game, moves)
+    assert game.id is not None
+    return repo.load(game.id)
 
 
 class GameService:
@@ -226,7 +273,7 @@ class GameService:
     async def _bot_move(self, board: chess.Board, game: Game) -> Move:
         """Ask the engine for the bot's move, push it onto `board` and return its record."""
         limit, options = rules.bot_search(
-            LEVEL_PRESETS[game.bot_level], self._settings.bot_movetime_s
+            LEVEL_PRESETS[_bot_level(game)], self._settings.bot_movetime_s
         )
         move = await self._engine.play(board, limit, options)
         return _record(board, move, by_bot=True)
@@ -243,6 +290,12 @@ def _record(board: chess.Board, move: chess.Move, *, by_bot: bool) -> Move:
     san = board.san(move)
     board.push(move)
     return Move(game_id=0, ply=ply, uci=move.uci(), san=san, fen_after=board.fen(), by_bot=by_bot)
+
+
+def _bot_level(game: Game) -> BotLevel:
+    if game.bot_level is None:
+        raise GameRuleError("Las partidas importadas no se pueden jugar.")
+    return game.bot_level
 
 
 def _finish(game: Game, outcome: Outcome) -> None:
