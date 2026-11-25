@@ -13,6 +13,8 @@ router = APIRouter()
 class EngineHealth(BaseModel):
     status: Literal["ok", "unavailable"]
     name: str | None = None
+    # True while the engine is searching; health then only checks that the process is alive.
+    busy: bool = False
     detail: str | None = None
 
 
@@ -32,6 +34,19 @@ async def health(
         return HealthResponse(
             status="degraded",
             engine=EngineHealth(status="unavailable", detail=engine_state.error),
+        )
+    if engine.is_busy:
+        # Don't queue a ping behind a long search: a live process is healthy enough.
+        if engine.is_alive:
+            return HealthResponse(
+                status="ok", engine=EngineHealth(status="ok", name=engine.name, busy=True)
+            )
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return HealthResponse(
+            status="degraded",
+            engine=EngineHealth(
+                status="unavailable", name=engine.name, detail="Engine process died"
+            ),
         )
     try:
         await engine.ping()

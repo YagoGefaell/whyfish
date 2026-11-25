@@ -8,7 +8,7 @@
   "Fuerte ~2000", "Máximo"). Implementación: `UCI_LimitStrength` + `UCI_Elo` donde el
   motor lo permita; por debajo del Elo mínimo soportado, `Skill Level` y tiempo/profundidad
   reducidos. Calibración en `config.py`.
-- Control de tiempo opcional (sin reloj por defecto: es una herramienta de aprendizaje).
+- Sin reloj ni control de tiempo (descartado: es una herramienta de aprendizaje).
 - Durante la partida: sin ayudas por defecto. Opciones activables: deshacer jugada,
   pista (muestra la pieza a mover, no la casilla destino).
 - Abandonar / ofrecer tablas. Fin por mate, ahogado, repetición, 50 jugadas, material insuficiente.

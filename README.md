@@ -28,5 +28,11 @@ make install
 make dev                  # backend en :8000, frontend en http://localhost:5173
 ```
 
-Otros comandos: `make test`, `make lint`, `make fmt` (`make help` para la lista).
+Abre http://localhost:5173, elige color y nivel y juega. Las partidas se guardan en
+`data/whyfish.db` (SQLite) y se pueden retomar desde **Historial** o recargando la página.
+
+Otros comandos (`make help` para la lista):
+- `make test` — tests rápidos (motor falso + Vitest).
+- `make test-integration` — tests contra el Stockfish real (partida completa contra cada nivel).
+- `make lint`, `make fmt`.
 Todas las rutas del backend van bajo `/api`. `GET /api/health` devuelve el estado y la versión de Stockfish.

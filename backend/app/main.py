@@ -1,11 +1,13 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import games, health
 from app.config import Settings, get_settings
+from app.db import init_db, make_db_engine
 from app.engine.state import EngineState
 from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
 
@@ -25,6 +27,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        db_engine = make_db_engine(resolved_settings.database_url)
+        init_db(db_engine)
+        app.state.settings = resolved_settings
+        app.state.db_engine = db_engine
+        app.state.game_lock = asyncio.Lock()
+
         engine_state = EngineState()
         try:
             engine_state.engine = await engine_factory(resolved_settings)
@@ -38,9 +46,11 @@ def create_app(
         finally:
             if engine_state.engine is not None:
                 await engine_state.engine.close()
+            db_engine.dispose()
 
     app = FastAPI(title="whyfish", lifespan=lifespan)
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(games.router, prefix=API_PREFIX)
     return app
 
 

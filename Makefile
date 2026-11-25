@@ -1,12 +1,13 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration \
         lint lint-backend lint-frontend fmt
 
 help:
 	@echo "make install   Install backend (uv) and frontend (pnpm) dependencies"
 	@echo "make dev       Run backend (:$(BACKEND_PORT)) and frontend (Vite) together"
-	@echo "make test      Run pytest + Vitest"
+	@echo "make test      Fast tests: pytest (fake engine) + Vitest"
+	@echo "make test-integration  Tests against the real Stockfish (reduced search times)"
 	@echo "make lint      ruff + mypy --strict, ESLint + Prettier + tsc"
 	@echo "make fmt       Auto-format backend and frontend"
 
@@ -26,7 +27,10 @@ dev-frontend:
 test: test-backend test-frontend
 
 test-backend:
-	cd backend && uv run pytest
+	cd backend && uv run pytest -m "not integration"
+
+test-integration:
+	cd backend && uv run pytest -m integration
 
 test-frontend:
 	cd frontend && pnpm test

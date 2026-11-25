@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
 from app.main import create_app
-from tests.conftest import FakeEngine
+from tests.conftest import FakeEngine, factory_for
 
 
 def test_health_ok_reports_engine_name(client: TestClient) -> None:
@@ -12,7 +12,7 @@ def test_health_ok_reports_engine_name(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "engine": {"status": "ok", "name": "FakeFish 1", "detail": None},
+        "engine": {"status": "ok", "name": "FakeFish 1", "detail": None, "busy": False},
     }
 
 
@@ -30,6 +30,27 @@ def test_health_503_when_engine_stops_responding(
     assert "not responding" in body["engine"]["detail"]
 
 
+def test_health_ok_without_ping_while_engine_is_busy(
+    client: TestClient, fake_engine: FakeEngine
+) -> None:
+    fake_engine.busy = True
+    fake_engine.responsive = False  # a ping would fail: proves we don't ping while busy
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["engine"]["busy"] is True
+
+
+def test_health_503_when_busy_engine_process_died(
+    client: TestClient, fake_engine: FakeEngine
+) -> None:
+    fake_engine.busy = True
+    fake_engine.alive = False
+
+    assert client.get("/api/health").status_code == 503
+
+
 def test_app_starts_and_reports_503_when_engine_fails_to_start(settings: Settings) -> None:
     async def failing_factory(_: Settings) -> Engine:
         raise EngineUnavailableError("boom")
@@ -38,7 +59,12 @@ def test_app_starts_and_reports_503_when_engine_fails_to_start(settings: Setting
         response = c.get("/api/health")
 
     assert response.status_code == 503
-    assert response.json()["engine"] == {"status": "unavailable", "name": None, "detail": "boom"}
+    assert response.json()["engine"] == {
+        "status": "unavailable",
+        "name": None,
+        "detail": "boom",
+        "busy": False,
+    }
 
 
 def test_missing_stockfish_path_is_reported(settings: Settings) -> None:
@@ -50,9 +76,6 @@ def test_missing_stockfish_path_is_reported(settings: Settings) -> None:
 
 
 def test_engine_is_closed_on_shutdown(settings: Settings, fake_engine: FakeEngine) -> None:
-    async def factory(_: Settings) -> Engine:
-        return fake_engine
-
-    with TestClient(create_app(settings, engine_factory=factory)):
+    with TestClient(create_app(settings, engine_factory=factory_for(fake_engine))):
         assert not fake_engine.closed
     assert fake_engine.closed
