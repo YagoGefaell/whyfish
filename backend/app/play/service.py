@@ -208,7 +208,7 @@ class GameService:
         loaded = self._repo.load(game_id)
         game = loaded.game
         self._require_ongoing(game)
-        if rules.draw_too_early(loaded.board, self._settings.draw_min_fullmove):
+        if rules.draw_too_early(loaded.board, self._settings.draw_min_moves):
             return DrawDecline.TOO_EARLY, loaded
         score = await self._engine.evaluate(
             loaded.board, chess.engine.Limit(time=self._settings.draw_eval_time_s)

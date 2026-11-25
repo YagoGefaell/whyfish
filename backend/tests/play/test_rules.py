@@ -120,12 +120,20 @@ class TestValidateStartFen:
             rules.validate_start_fen(fen)
 
 
-@pytest.mark.parametrize(
-    ("fullmove", "too_early"), [(1, True), (19, True), (20, False), (45, False)]
-)
-def test_draw_too_early(fullmove: int, too_early: bool) -> None:
-    board = chess.Board(f"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 {fullmove}")
-    assert rules.draw_too_early(board, min_fullmove=20) is too_early
+def _shuffle_knights(plies: int, fen: str = chess.STARTING_FEN) -> chess.Board:
+    cycle = ["g1f3", "g8f6", "f3g1", "f6g8"]
+    return rules.board_from_moves(fen, [cycle[i % 4] for i in range(plies)])
+
+
+@pytest.mark.parametrize(("plies", "too_early"), [(0, True), (39, True), (40, False), (55, False)])
+def test_draw_too_early_counts_full_moves_played(plies: int, too_early: bool) -> None:
+    assert rules.draw_too_early(_shuffle_knights(plies), min_moves=20) is too_early
+
+
+def test_draw_too_early_ignores_fen_move_number() -> None:
+    late_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 60"
+    assert rules.draw_too_early(_shuffle_knights(10, late_fen), min_moves=20) is True
+    assert rules.draw_too_early(_shuffle_knights(40, late_fen), min_moves=20) is False
 
 
 class TestShouldAcceptDraw:

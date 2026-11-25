@@ -60,7 +60,7 @@ export interface NewGame {
 export interface DrawOffer {
   accepted: boolean
   declined_reason: 'too_early' | 'position' | null
-  min_fullmove: number
+  min_moves: number
   game: GameState
 }
 

@@ -1,9 +1,11 @@
 import io
+from collections.abc import Iterator
 from typing import Any
 
 import chess
 import chess.engine
 import chess.pgn
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -112,8 +114,7 @@ class TestMoves:
 
 
 PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
-START_AT_MOVE_19 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 19"
-START_AT_MOVE_20 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 20"
+START_AT_MOVE_60 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 60"
 
 
 class TestStartFromFen:
@@ -207,40 +208,74 @@ class TestEndings:
         assert (state["result"], state["termination"]) == ("1-0", "resignation")
         assert client.post(f"/api/games/{game['id']}/resign").status_code == 409
 
-    def test_draw_declined_before_move_20_without_asking_engine(
+    def test_draw_declined_before_20_moves_without_asking_engine(
         self, client: TestClient, fake_engine: FakeEngine
     ) -> None:
-        game = create(client, color="white", fen=START_AT_MOVE_19)
+        game = create(client, color="white")
         fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(-500), chess.BLACK)
         body = client.post(f"/api/games/{game['id']}/draw").json()
         assert body["accepted"] is False
-        assert (body["declined_reason"], body["min_fullmove"]) == ("too_early", 20)
+        assert (body["declined_reason"], body["min_moves"]) == ("too_early", 20)
         assert body["game"]["status"] == "ongoing"
         assert fake_engine.evaluate_calls == 0
 
-    def test_draw_accepted_from_move_20_when_bot_not_better(
+    def test_fen_move_number_does_not_count(
         self, client: TestClient, fake_engine: FakeEngine
     ) -> None:
-        game = create(client, color="white", fen=START_AT_MOVE_20)
-        fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(20), chess.BLACK)
+        game = create(client, color="white", fen=START_AT_MOVE_60)
         body = client.post(f"/api/games/{game['id']}/draw").json()
+        assert (body["accepted"], body["declined_reason"]) == (False, "too_early")
+        assert fake_engine.evaluate_calls == 0
+
+
+class TestDrawAfterMinimumMoves:
+    """With DRAW_MIN_MOVES=2 so the minimum can be reached without repeating positions."""
+
+    @pytest.fixture
+    def client2(self, fake_engine: FakeEngine) -> Iterator[TestClient]:
+        settings = make_settings(draw_min_moves=2)
+        with TestClient(create_app(settings, engine_factory=factory_for(fake_engine))) as c:
+            yield c
+
+    def _game_with_moves(self, c: TestClient, fake: FakeEngine, fen: str | None = None) -> int:
+        gid: int = create(c, color="white", fen=fen)["id"]
+        fake.scripted = ["e7e5", "d7d5"]
+        play_all(c, gid, ["e2e4", "d2d4"])  # 2 full moves played in this game
+        return gid
+
+    def test_still_too_early_after_one_move(
+        self, client2: TestClient, fake_engine: FakeEngine
+    ) -> None:
+        gid = create(client2, color="white")["id"]
+        play_all(client2, gid, ["e2e4"])
+        body = client2.post(f"/api/games/{gid}/draw").json()
+        assert (body["accepted"], body["declined_reason"], body["min_moves"]) == (
+            False,
+            "too_early",
+            2,
+        )
+
+    def test_accepted_when_bot_not_better(
+        self, client2: TestClient, fake_engine: FakeEngine
+    ) -> None:
+        gid = self._game_with_moves(client2, fake_engine)
+        fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(20), chess.BLACK)
+        body = client2.post(f"/api/games/{gid}/draw").json()
         assert (body["accepted"], body["declined_reason"]) == (True, None)
         assert (body["game"]["result"], body["game"]["termination"]) == ("1/2-1/2", "draw_agreed")
 
-    def test_draw_declined_when_bot_better(
-        self, client: TestClient, fake_engine: FakeEngine
-    ) -> None:
-        game = create(client, color="white", fen=START_AT_MOVE_20)
+    def test_declined_when_bot_better(self, client2: TestClient, fake_engine: FakeEngine) -> None:
+        gid = self._game_with_moves(client2, fake_engine)
         fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(150), chess.BLACK)
-        body = client.post(f"/api/games/{game['id']}/draw").json()
+        body = client2.post(f"/api/games/{gid}/draw").json()
         assert (body["accepted"], body["declined_reason"]) == (False, "position")
         assert body["game"]["status"] == "ongoing"
 
-    def test_draw_min_move_is_configurable(self, fake_engine: FakeEngine) -> None:
-        settings = make_settings(draw_min_fullmove=1)
-        with TestClient(create_app(settings, engine_factory=factory_for(fake_engine))) as c:
-            game = create(c, color="white")
-            body = c.post(f"/api/games/{game['id']}/draw").json()
+    def test_fen_game_counts_moves_since_the_fen(
+        self, client2: TestClient, fake_engine: FakeEngine
+    ) -> None:
+        gid = self._game_with_moves(client2, fake_engine, fen=START_AT_MOVE_60)
+        body = client2.post(f"/api/games/{gid}/draw").json()
         assert body["accepted"] is True
 
 

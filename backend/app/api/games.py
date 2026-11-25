@@ -138,7 +138,7 @@ async def offer_draw(
     return DrawOfferRead(
         accepted=declined is None,
         declined_reason=declined,
-        min_fullmove=settings.draw_min_fullmove,
+        min_moves=settings.draw_min_moves,
         game=GameState.from_loaded(loaded),
     )
 

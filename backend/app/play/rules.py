@@ -166,9 +166,13 @@ def bot_search(
     return limit, options
 
 
-def draw_too_early(board: chess.Board, min_fullmove: int) -> bool:
-    """The bot never accepts a draw before move `min_fullmove`."""
-    return board.fullmove_number < min_fullmove
+def draw_too_early(board: chess.Board, min_moves: int) -> bool:
+    """The bot never accepts a draw before `min_moves` full moves are played in this game.
+
+    `board` must be built from the game's initial position, so its move stack holds exactly
+    the plies played in this game (the FEN's own move number does not count).
+    """
+    return len(board.move_stack) < 2 * min_moves
 
 
 def should_accept_draw(score: chess.engine.PovScore, bot_color: chess.Color, max_cp: int) -> bool:

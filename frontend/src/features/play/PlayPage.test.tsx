@@ -96,7 +96,7 @@ describe('PlayPage', () => {
       {
         method: 'POST',
         path: '/api/games/7/draw',
-        body: { accepted: false, declined_reason: 'position', min_fullmove: 20, game: gameState() },
+        body: { accepted: false, declined_reason: 'position', min_moves: 20, game: gameState() },
       },
     ])
     renderAt('/play/7')
@@ -113,7 +113,7 @@ describe('PlayPage', () => {
         body: {
           accepted: false,
           declined_reason: 'too_early',
-          min_fullmove: 20,
+          min_moves: 20,
           game: gameState(),
         },
       },
@@ -121,7 +121,7 @@ describe('PlayPage', () => {
     renderAt('/play/7')
     fireEvent.click(await screen.findByRole('button', { name: 'Ofrecer tablas' }))
     expect(
-      await screen.findByText('Stockfish no acepta tablas antes de la jugada 20.'),
+      await screen.findByText('Stockfish no acepta tablas hasta que se hayan jugado 20 jugadas.'),
     ).toBeInTheDocument()
   })
 

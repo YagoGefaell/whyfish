@@ -3,7 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y clasificación).
+Fase 1 — **cerrada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y clasificación), que
+se empieza en una conversación nueva: leer SPEC + ROADMAP + este archivo y proponer el plan.
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -54,17 +55,19 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
 - Verificado a mano por API vía Vite con Stockfish real: crear, jugar, health durante búsqueda,
   pista, deshacer, tablas, PGN.
 - **Ajustes de cierre (aprobados tras la revisión):**
-  - Tablas: el bot no las acepta antes de la jugada `DRAW_MIN_FULLMOVE` (20), sin consultar
-    al motor; la respuesta indica el motivo (`declined_reason`: `too_early` | `position`).
+  - Tablas: el bot no las acepta hasta que se hayan jugado `DRAW_MIN_MOVES` (20) jugadas
+    completas en la propia partida, sin consultar al motor; la respuesta indica el motivo
+    (`declined_reason`: `too_early` | `position`).
   - Nueva partida desde FEN (campo opcional en el formulario). El backend valida formato,
     legalidad (`board.is_valid()`) y que no esté terminada; mensajes en español. Si en la FEN
     mueve el bot, juega primero. PGN con `[SetUp "1"]` y `[FEN "..."]`. La lista de jugadas
     numera según la FEN (turno y número de jugada).
-  - Tests: backend 91 unitarios + 9 integración; frontend 27.
+  - Tests: backend 94 unitarios + 9 integración; frontend 27.
 
 ## Pendiente / siguiente paso
-- Probar la UI a mano en el navegador (arrastrar y soltar, promoción) — no automatizado.
-- Fase 2: plan a proponer.
+- Fase 2 (nueva conversación): proponer plan y esperar OK.
+- La UI de juego no tiene tests de navegador reales (arrastrar y soltar, promoción): solo
+  Vitest + pruebas por API. Valorar tests E2E más adelante.
 
 ## Decisiones tomadas
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
@@ -92,9 +95,9 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
   búsqueda (python-chess las restaura).
 - **Fin de partida:** triple repetición y 50 jugadas terminan la partida automáticamente, pero
   solo cuando han ocurrido de verdad (no al poder reclamarse con la siguiente jugada).
-- **Tablas:** el bot acepta solo desde la jugada 20 (`DRAW_MIN_FULLMOVE`, número de jugada del
-  tablero; en partidas desde FEN cuenta el de la FEN) y si su evaluación (su punto de vista) es
-  ≤ +0,3 (`DRAW_ACCEPT_MAX_CP`).
+- **Tablas:** el bot acepta solo cuando se han jugado al menos 20 jugadas completas (40 medias
+  jugadas) en la propia partida (`DRAW_MIN_MOVES`; en partidas desde FEN el número de jugada de
+  la FEN no cuenta) y si su evaluación (su punto de vista) es ≤ +0,3 (`DRAW_ACCEPT_MAX_CP`).
 - **Partida desde FEN:** posición legal y no terminada, validada en el backend; FEN vacío =
   posición inicial normal.
 - **Deshacer:** quita tu última jugada y la respuesta del bot; solo en partidas en curso.
@@ -104,6 +107,8 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
 - **BD sin migraciones:** `create_all` al arrancar; Alembic antes de la Fase 8. Cambiar el
   esquema implica borrar `data/whyfish.db` hasta entonces.
 - **Reloj:** descartado (eliminado de SPEC §1.1).
+- **Pruebas manuales aisladas:** nunca contra `data/whyfish.db` ni el `make dev` del usuario;
+  base temporal (`DATABASE_URL`) y otro puerto, comprobando antes los puertos (CLAUDE.md).
 - **Tests de integración aparte:** marcador `integration`, `make test-integration`, tiempos de
   búsqueda reducidos; `make test` no los ejecuta.
 - **Un comando UCI a la vez por motor:** todo acceso al motor pasa por el lock de

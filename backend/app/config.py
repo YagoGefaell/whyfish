@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     draw_eval_time_s: float = 0.3
     # The bot accepts a draw if its evaluation (its own point of view) is <= this, in centipawns.
     draw_accept_max_cp: int = 30
-    # ...and never before this move number (the board's fullmove number, so a game started
-    # from a FEN counts from that FEN's move number).
-    draw_min_fullmove: int = 20
+    # ...and never before this many full moves have been played in this game (a game started
+    # from a FEN counts only the moves played since that position).
+    draw_min_moves: int = 20
     # Name of the human player in PGN headers.
     player_name: str = "Jugador"
 

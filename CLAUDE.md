@@ -80,3 +80,7 @@ docs/
 5. Al cerrar la fase: actualiza `docs/PROGRESS.md` (hecho, pendiente, decisiones,
    deuda técnica) y dame un resumen de 5–10 líneas con cómo probarlo.
 6. Si algo de SPEC resulta mala idea al implementarlo, dilo y propón el cambio en SPEC.
+7. Nunca uses data/whyfish.db ni el servidor de make dev para pruebas. Las pruebas manuales usan
+   una base temporal (variable de entorno para la ruta de la BD) y otro puerto. Comprueba antes
+   si los puertos están ocupados. (Ej.: `DATABASE_URL=sqlite:////tmp/x.db` y
+   `make dev-backend BACKEND_PORT=8010`; puertos con `ss -ltnp`.)

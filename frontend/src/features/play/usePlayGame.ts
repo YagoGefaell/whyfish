@@ -103,7 +103,9 @@ export function usePlayGame(gameId: number): PlayGame {
     run('draw', async () => {
       const offer = await gamesApi.offerDraw(gameId)
       if (offer.declined_reason === 'too_early') {
-        setNotice(`Stockfish no acepta tablas antes de la jugada ${String(offer.min_fullmove)}.`)
+        setNotice(
+          `Stockfish no acepta tablas hasta que se hayan jugado ${String(offer.min_moves)} jugadas.`,
+        )
       } else if (offer.declined_reason === 'position') {
         setNotice('Stockfish rechaza las tablas.')
       }

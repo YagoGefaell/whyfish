@@ -97,7 +97,7 @@ class HintRead(BaseModel):
 
 class DrawOfferRead(BaseModel):
     accepted: bool
-    # Why the bot declined: "too_early" (before `min_fullmove`) or "position" (evaluation).
+    # Why the bot declined: "too_early" (fewer than `min_moves` played) or "position" (evaluation).
     declined_reason: DrawDecline | None
-    min_fullmove: int
+    min_moves: int
     game: GameState
