@@ -23,6 +23,13 @@ describe('texts', () => {
 })
 
 describe('moveRows', () => {
+  it('follows the start position of a FEN game', () => {
+    expect(moveRows(['Kg7', 'a8=Q'], '8/P6k/8/8/8/8/8/K7 b - - 0 30')).toEqual([
+      [30, '…', 'Kg7'],
+      [31, 'a8=Q', ''],
+    ])
+  })
+
   it('numbers full moves', () => {
     expect(moveRows(['e4', 'e5', 'Nf3'])).toEqual([
       [1, 'e4', 'e5'],

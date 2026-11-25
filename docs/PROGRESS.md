@@ -53,6 +53,14 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
   (`/play/:id` reconstruye posición, turno, jugadas y ayudas usadas desde el servidor).
 - Verificado a mano por API vía Vite con Stockfish real: crear, jugar, health durante búsqueda,
   pista, deshacer, tablas, PGN.
+- **Ajustes de cierre (aprobados tras la revisión):**
+  - Tablas: el bot no las acepta antes de la jugada `DRAW_MIN_FULLMOVE` (20), sin consultar
+    al motor; la respuesta indica el motivo (`declined_reason`: `too_early` | `position`).
+  - Nueva partida desde FEN (campo opcional en el formulario). El backend valida formato,
+    legalidad (`board.is_valid()`) y que no esté terminada; mensajes en español. Si en la FEN
+    mueve el bot, juega primero. PGN con `[SetUp "1"]` y `[FEN "..."]`. La lista de jugadas
+    numera según la FEN (turno y número de jugada).
+  - Tests: backend 91 unitarios + 9 integración; frontend 27.
 
 ## Pendiente / siguiente paso
 - Probar la UI a mano en el navegador (arrastrar y soltar, promoción) — no automatizado.
@@ -84,7 +92,11 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
   búsqueda (python-chess las restaura).
 - **Fin de partida:** triple repetición y 50 jugadas terminan la partida automáticamente, pero
   solo cuando han ocurrido de verdad (no al poder reclamarse con la siguiente jugada).
-- **Tablas:** el bot acepta si su evaluación (su punto de vista) es ≤ +0,3 (`DRAW_ACCEPT_MAX_CP`).
+- **Tablas:** el bot acepta solo desde la jugada 20 (`DRAW_MIN_FULLMOVE`, número de jugada del
+  tablero; en partidas desde FEN cuenta el de la FEN) y si su evaluación (su punto de vista) es
+  ≤ +0,3 (`DRAW_ACCEPT_MAX_CP`).
+- **Partida desde FEN:** posición legal y no terminada, validada en el backend; FEN vacío =
+  posición inicial normal.
 - **Deshacer:** quita tu última jugada y la respuesta del bot; solo en partidas en curso.
   **Pista:** casilla de la pieza a mover (búsqueda a fuerza completa, `HINT_TIME_S`). Ambas se
   activan al crear la partida, se cuentan y se anotan en el PGN (`[Assists "undo:N hint:N"]`).
@@ -109,12 +121,8 @@ Fase 1 — **completada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y 
 
 ## Deuda técnica / dudas abiertas
 - Elo de Principiante/Novato aproximado y sin calibrar.
-- Con la regla de tablas ≤ +0,3 el bot acepta casi siempre en la apertura (posición igualada).
-  Revisar si se quiere exigir un mínimo de jugadas.
 - SQLite se usa con sesión síncrona dentro de endpoints async: bloquea el event loop unos ms
   por petición. Aceptable para un solo usuario; revisar si molesta en la Fase 2 (SSE).
-- La partida no se puede iniciar desde una FEN por API todavía (solo en tests); llegará con
-  Importar (Fase 3).
 - Starlette avisa de que `httpx` está deprecado para `TestClient` en favor de `httpx2`.
   Cambio pendiente (en esta sesión no se aplicó); de momento solo es un warning.
 - Revisar la subida a TypeScript 7 cuando typescript-eslint lo soporte.

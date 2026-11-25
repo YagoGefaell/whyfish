@@ -38,6 +38,7 @@ class FakeEngine:
         default_factory=lambda: chess.engine.PovScore(chess.engine.Cp(0), chess.WHITE)
     )
     play_calls: list[PlayCall] = field(default_factory=list)
+    evaluate_calls: int = 0
     closed: bool = False
 
     @property
@@ -72,6 +73,7 @@ class FakeEngine:
     async def evaluate(
         self, board: chess.Board, limit: chess.engine.Limit
     ) -> chess.engine.PovScore:
+        self.evaluate_calls += 1
         return self.evaluation
 
     async def close(self) -> None:

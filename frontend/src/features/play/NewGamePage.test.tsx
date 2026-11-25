@@ -38,6 +38,35 @@ describe('NewGamePage', () => {
       level: 'beginner',
       allow_undo: false,
       allow_hint: true,
+      fen: null,
     })
+  })
+
+  it('sends a start FEN and shows the backend validation error', async () => {
+    const calls = mockApi([
+      { path: '/api/levels', body: [{ id: 'club', label: 'Club ~1500' }] },
+      {
+        method: 'POST',
+        path: '/api/games',
+        status: 400,
+        body: { detail: 'La posición del FEN no es legal.' },
+      },
+    ])
+    render(
+      <MemoryRouter>
+        <NewGamePage />
+      </MemoryRouter>,
+    )
+    await screen.findByRole('option', { name: 'Club ~1500' })
+    fireEvent.change(screen.getByLabelText('Posición inicial (FEN, opcional)'), {
+      target: { value: '  4k3/8/8/8/8/8/4R3/4K3 w - - 0 1 ' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('La posición del FEN no es legal.')
+    expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({
+      fen: '4k3/8/8/8/8/8/4R3/4K3 w - - 0 1',
+    })
+    expect(screen.getByRole('button', { name: 'Empezar' })).toBeEnabled()
   })
 })

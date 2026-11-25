@@ -54,7 +54,7 @@ function PlayGameView({ gameId }: { gameId: number }) {
             </p>
           )}
         </header>
-        <MoveList moves={game.moves} />
+        <MoveList moves={game.moves} initialFen={game.initial_fen} />
         <Controls
           play={play}
           game={game}

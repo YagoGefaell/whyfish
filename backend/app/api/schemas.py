@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.config import LEVEL_PRESETS, BotLevel
 from app.models.game import Game
-from app.play.rules import PlayerColor, Termination
+from app.play.rules import DrawDecline, PlayerColor, Termination
 from app.play.service import ColorChoice, LoadedGame
 
 
@@ -20,6 +20,8 @@ class GameCreate(BaseModel):
     level: BotLevel = BotLevel.CLUB
     allow_undo: bool = False
     allow_hint: bool = False
+    # Optional start position; blank means the standard start.
+    fen: str | None = None
 
 
 class MoveCreate(BaseModel):
@@ -95,4 +97,7 @@ class HintRead(BaseModel):
 
 class DrawOfferRead(BaseModel):
     accepted: bool
+    # Why the bot declined: "too_early" (before `min_fullmove`) or "position" (evaluation).
+    declined_reason: DrawDecline | None
+    min_fullmove: int
     game: GameState

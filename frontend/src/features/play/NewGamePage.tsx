@@ -16,6 +16,7 @@ export function NewGamePage() {
   const [level, setLevel] = useState<BotLevel>('club')
   const [allowUndo, setAllowUndo] = useState(false)
   const [allowHint, setAllowHint] = useState(false)
+  const [fen, setFen] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,7 +34,13 @@ export function NewGamePage() {
     setSubmitting(true)
     setError(null)
     gamesApi
-      .create({ color, level, allow_undo: allowUndo, allow_hint: allowHint })
+      .create({
+        color,
+        level,
+        allow_undo: allowUndo,
+        allow_hint: allowHint,
+        fen: fen.trim() || null,
+      })
       .then((game) => navigate(`/play/${String(game.id)}`))
       .catch((err: unknown) => {
         setError(err instanceof ApiError ? err.message : 'No se pudo crear la partida.')
@@ -105,6 +112,27 @@ export function NewGamePage() {
           Permitir pistas (muestra qué pieza mover)
         </label>
       </fieldset>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="start-fen" className="font-medium">
+          Posición inicial (FEN, opcional)
+        </label>
+        <input
+          id="start-fen"
+          type="text"
+          value={fen}
+          onChange={(e) => {
+            setFen(e.target.value)
+          }}
+          placeholder="Vacío = posición inicial normal"
+          spellCheck={false}
+          aria-describedby="start-fen-help"
+          className="rounded border border-gray-300 px-2 py-1 font-mono text-sm"
+        />
+        <span id="start-fen-help" className="text-xs text-gray-500">
+          Si le toca mover al bot en esa posición, juega él primero.
+        </span>
+      </div>
 
       {error && (
         <p role="alert" className="text-red-600">

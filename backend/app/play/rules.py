@@ -47,11 +47,30 @@ _FROM_CHESS_TERMINATION: dict[chess.Termination, Termination] = {
 
 DRAW = "1/2-1/2"
 
+_FINISHED_TEXT: dict[Termination, str] = {
+    Termination.CHECKMATE: "jaque mate",
+    Termination.STALEMATE: "ahogado",
+    Termination.INSUFFICIENT_MATERIAL: "material insuficiente",
+    Termination.THREEFOLD_REPETITION: "triple repetición",
+    Termination.FIFTY_MOVES: "regla de las 50 jugadas",
+    Termination.RESIGNATION: "abandono",
+    Termination.DRAW_AGREED: "tablas acordadas",
+}
+
 FULL_STRENGTH_OPTIONS: dict[str, int | bool] = {"UCI_LimitStrength": False, "Skill Level": 20}
 
 
 class IllegalMoveError(ValueError):
     pass
+
+
+class InvalidFenError(ValueError):
+    """A start position that cannot be played. The message is user-facing (Spanish)."""
+
+
+class DrawDecline(StrEnum):
+    TOO_EARLY = "too_early"
+    POSITION = "position"
 
 
 @dataclass(frozen=True)
@@ -65,6 +84,22 @@ def board_from_moves(initial_fen: str, ucis: Sequence[str]) -> chess.Board:
     for uci in ucis:
         board.push_uci(uci)
     return board
+
+
+def validate_start_fen(fen: str) -> str:
+    """Check that `fen` is a legal, unfinished position and return it normalized."""
+    try:
+        board = chess.Board(fen.strip())
+    except ValueError as exc:
+        raise InvalidFenError("El FEN no tiene un formato válido.") from exc
+    if not board.is_valid():
+        raise InvalidFenError("La posición del FEN no es legal.")
+    outcome = game_outcome(board)
+    if outcome is not None:
+        raise InvalidFenError(
+            f"La posición ya está terminada ({_FINISHED_TEXT[outcome.termination]})."
+        )
+    return board.fen()
 
 
 def parse_move(board: chess.Board, uci: str) -> chess.Move:
@@ -129,6 +164,11 @@ def bot_search(
     else:
         options = FULL_STRENGTH_OPTIONS
     return limit, options
+
+
+def draw_too_early(board: chess.Board, min_fullmove: int) -> bool:
+    """The bot never accepts a draw before move `min_fullmove`."""
+    return board.fullmove_number < min_fullmove
 
 
 def should_accept_draw(score: chess.engine.PovScore, bot_color: chess.Color, max_cp: int) -> bool:

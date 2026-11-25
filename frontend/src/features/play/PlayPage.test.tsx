@@ -96,12 +96,33 @@ describe('PlayPage', () => {
       {
         method: 'POST',
         path: '/api/games/7/draw',
-        body: { accepted: false, game: gameState() },
+        body: { accepted: false, declined_reason: 'position', min_fullmove: 20, game: gameState() },
       },
     ])
     renderAt('/play/7')
     fireEvent.click(await screen.findByRole('button', { name: 'Ofrecer tablas' }))
     expect(await screen.findByText('Stockfish rechaza las tablas.')).toBeInTheDocument()
+  })
+
+  it('explains a draw offer declined because it is too early', async () => {
+    mockApi([
+      { path: '/api/games/7', body: gameState() },
+      {
+        method: 'POST',
+        path: '/api/games/7/draw',
+        body: {
+          accepted: false,
+          declined_reason: 'too_early',
+          min_fullmove: 20,
+          game: gameState(),
+        },
+      },
+    ])
+    renderAt('/play/7')
+    fireEvent.click(await screen.findByRole('button', { name: 'Ofrecer tablas' }))
+    expect(
+      await screen.findByText('Stockfish no acepta tablas antes de la jugada 20.'),
+    ).toBeInTheDocument()
   })
 
   it('shows a load error for a missing game', async () => {

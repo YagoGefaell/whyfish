@@ -5,14 +5,11 @@ import chess
 import chess.engine
 import chess.pgn
 from fastapi.testclient import TestClient
-from sqlmodel import Session
 
-from app.config import BotLevel, Settings
+from app.config import Settings
 from app.engine.stockfish import Engine, EngineUnavailableError
 from app.main import create_app
-from app.models.game import Game
-from app.play.rules import PlayerColor
-from tests.conftest import FakeEngine, factory_for, play_all
+from tests.conftest import FakeEngine, factory_for, make_settings, play_all
 
 
 def create(client: TestClient, **body: Any) -> dict[str, Any]:
@@ -114,22 +111,59 @@ class TestMoves:
         assert client.get(f"/api/games/{game['id']}").json()["moves"] == []
 
 
-class TestPromotion:
+PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
+START_AT_MOVE_19 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 19"
+START_AT_MOVE_20 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 20"
+
+
+class TestStartFromFen:
+    def test_player_to_move(self, client: TestClient) -> None:
+        game = create(client, color="white", fen=PROMOTION_FEN)
+        assert (game["initial_fen"], game["fen"]) == (PROMOTION_FEN, PROMOTION_FEN)
+        assert game["moves"] == []
+        assert game["turn"] == "white"
+
+    def test_bot_to_move_plays_first(self, client: TestClient, fake_engine: FakeEngine) -> None:
+        fen = "8/P6k/8/8/8/8/8/K7 b - - 0 1"
+        fake_engine.scripted = ["h7g7"]
+        game = create(client, color="white", fen=fen)
+        assert [(m["san"], m["by_bot"]) for m in game["moves"]] == [("Kg7", True)]
+        assert game["turn"] == "white"
+
     def test_player_promotes(self, client: TestClient) -> None:
-        # Start from a custom position (not exposed by the API yet): insert directly.
-        db_engine = client.app.state.db_engine  # type: ignore[attr-defined]
-        with Session(db_engine) as session:
-            game = Game(
-                player_color=PlayerColor.WHITE,
-                bot_level=BotLevel.MAX,
-                initial_fen="8/P6k/8/8/8/8/8/K7 w - - 0 1",
-            )
-            session.add(game)
-            session.commit()
-            game_id = game.id
-        assert game_id is not None
-        state = play_all(client, game_id, ["a7a8n"])
+        game = create(client, color="white", fen=PROMOTION_FEN)
+        state = play_all(client, game["id"], ["a7a8n"])
         assert state["moves"][0]["san"] == "a8=N"
+
+    def test_blank_fen_means_standard_start(self, client: TestClient) -> None:
+        assert create(client, fen="   ")["fen"] == chess.STARTING_FEN
+
+    def test_invalid_fen_is_rejected(self, client: TestClient) -> None:
+        response = client.post("/api/games", json={"fen": "not a fen"})
+        assert response.status_code == 400
+        assert response.json()["detail"] == "El FEN no tiene un formato válido."
+        assert client.get("/api/games").json() == []
+
+    def test_finished_position_is_rejected(self, client: TestClient) -> None:
+        mate = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
+        response = client.post("/api/games", json={"fen": mate})
+        assert response.status_code == 400
+        assert "terminada" in response.json()["detail"]
+
+    def test_pgn_has_setup_and_fen_tags(self, client: TestClient) -> None:
+        game = create(client, color="white", fen=PROMOTION_FEN)
+        play_all(client, game["id"], ["a7a8q"])
+        pgn = client.get(f"/api/games/{game['id']}/pgn").text
+        assert '[SetUp "1"]' in pgn
+        assert f'[FEN "{PROMOTION_FEN}"]' in pgn
+        parsed = chess.pgn.read_game(io.StringIO(pgn))
+        assert parsed is not None
+        assert [m.uci() for m in parsed.mainline_moves()][:1] == ["a7a8q"]  # + bot reply
+
+    def test_standard_start_pgn_has_no_setup_tags(self, client: TestClient) -> None:
+        game = create(client, color="white")
+        pgn = client.get(f"/api/games/{game['id']}/pgn").text
+        assert "SetUp" not in pgn and "[FEN" not in pgn
 
 
 class TestAssists:
@@ -173,23 +207,41 @@ class TestEndings:
         assert (state["result"], state["termination"]) == ("1-0", "resignation")
         assert client.post(f"/api/games/{game['id']}/resign").status_code == 409
 
-    def test_draw_accepted_when_bot_not_better(
+    def test_draw_declined_before_move_20_without_asking_engine(
         self, client: TestClient, fake_engine: FakeEngine
     ) -> None:
-        game = create(client, color="white")
+        game = create(client, color="white", fen=START_AT_MOVE_19)
+        fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(-500), chess.BLACK)
+        body = client.post(f"/api/games/{game['id']}/draw").json()
+        assert body["accepted"] is False
+        assert (body["declined_reason"], body["min_fullmove"]) == ("too_early", 20)
+        assert body["game"]["status"] == "ongoing"
+        assert fake_engine.evaluate_calls == 0
+
+    def test_draw_accepted_from_move_20_when_bot_not_better(
+        self, client: TestClient, fake_engine: FakeEngine
+    ) -> None:
+        game = create(client, color="white", fen=START_AT_MOVE_20)
         fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(20), chess.BLACK)
         body = client.post(f"/api/games/{game['id']}/draw").json()
-        assert body["accepted"] is True
+        assert (body["accepted"], body["declined_reason"]) == (True, None)
         assert (body["game"]["result"], body["game"]["termination"]) == ("1/2-1/2", "draw_agreed")
 
     def test_draw_declined_when_bot_better(
         self, client: TestClient, fake_engine: FakeEngine
     ) -> None:
-        game = create(client, color="white")
+        game = create(client, color="white", fen=START_AT_MOVE_20)
         fake_engine.evaluation = chess.engine.PovScore(chess.engine.Cp(150), chess.BLACK)
         body = client.post(f"/api/games/{game['id']}/draw").json()
-        assert body["accepted"] is False
+        assert (body["accepted"], body["declined_reason"]) == (False, "position")
         assert body["game"]["status"] == "ongoing"
+
+    def test_draw_min_move_is_configurable(self, fake_engine: FakeEngine) -> None:
+        settings = make_settings(draw_min_fullmove=1)
+        with TestClient(create_app(settings, engine_factory=factory_for(fake_engine))) as c:
+            game = create(c, color="white")
+            body = c.post(f"/api/games/{game['id']}/draw").json()
+        assert body["accepted"] is True
 
 
 class TestPgnAndHistory:

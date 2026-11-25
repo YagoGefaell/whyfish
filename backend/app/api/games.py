@@ -17,7 +17,7 @@ from app.api.schemas import (
 )
 from app.config import LEVEL_PRESETS, Settings
 from app.engine.stockfish import EngineUnavailableError
-from app.play.rules import IllegalMoveError
+from app.play.rules import IllegalMoveError, InvalidFenError
 from app.play.service import (
     GameNotFoundError,
     GameRepository,
@@ -36,6 +36,8 @@ Lock = Annotated[asyncio.Lock, Depends(get_game_lock)]
 def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, GameNotFoundError):
         return HTTPException(status.HTTP_404_NOT_FOUND, "Partida no encontrada.")
+    if isinstance(exc, InvalidFenError):
+        return HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
     if isinstance(exc, IllegalMoveError):
         return HTTPException(status.HTTP_400_BAD_REQUEST, "Jugada ilegal.")
     if isinstance(exc, GameRuleError):
@@ -45,7 +47,13 @@ def _http_error(exc: Exception) -> HTTPException:
     raise exc
 
 
-_ERRORS = (GameNotFoundError, IllegalMoveError, GameRuleError, EngineUnavailableError)
+_ERRORS = (
+    GameNotFoundError,
+    InvalidFenError,
+    IllegalMoveError,
+    GameRuleError,
+    EngineUnavailableError,
+)
 
 
 @router.get("/levels")
@@ -62,7 +70,9 @@ def list_games(repo: Repo) -> list[GameSummary]:
 async def create_game(body: GameCreate, service: Service, lock: Lock) -> GameState:
     async with lock:
         try:
-            loaded = await service.create(body.color, body.level, body.allow_undo, body.allow_hint)
+            loaded = await service.create(
+                body.color, body.level, body.allow_undo, body.allow_hint, fen=body.fen
+            )
         except _ERRORS as exc:
             raise _http_error(exc) from exc
     return GameState.from_loaded(loaded)
@@ -114,13 +124,23 @@ async def resign(game_id: int, service: Service, lock: Lock) -> GameState:
 
 
 @router.post("/games/{game_id}/draw")
-async def offer_draw(game_id: int, service: Service, lock: Lock) -> DrawOfferRead:
+async def offer_draw(
+    game_id: int,
+    service: Service,
+    lock: Lock,
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> DrawOfferRead:
     async with lock:
         try:
-            accepted, loaded = await service.offer_draw(game_id)
+            declined, loaded = await service.offer_draw(game_id)
         except _ERRORS as exc:
             raise _http_error(exc) from exc
-    return DrawOfferRead(accepted=accepted, game=GameState.from_loaded(loaded))
+    return DrawOfferRead(
+        accepted=declined is None,
+        declined_reason=declined,
+        min_fullmove=settings.draw_min_fullmove,
+        game=GameState.from_loaded(loaded),
+    )
 
 
 @router.get("/games/{game_id}/pgn", response_class=PlainTextResponse)

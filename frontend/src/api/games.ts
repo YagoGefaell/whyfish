@@ -53,6 +53,15 @@ export interface NewGame {
   level: BotLevel
   allow_undo: boolean
   allow_hint: boolean
+  /** Optional start position; null means the standard start. */
+  fen: string | null
+}
+
+export interface DrawOffer {
+  accepted: boolean
+  declined_reason: 'too_early' | 'position' | null
+  min_fullmove: number
+  game: GameState
 }
 
 const post = <T>(path: string, body?: unknown) =>
@@ -67,7 +76,6 @@ export const gamesApi = {
   undo: (id: number) => post<GameState>(`/games/${String(id)}/undo`),
   hint: (id: number) => post<{ square: string }>(`/games/${String(id)}/hint`),
   resign: (id: number) => post<GameState>(`/games/${String(id)}/resign`),
-  offerDraw: (id: number) =>
-    post<{ accepted: boolean; game: GameState }>(`/games/${String(id)}/draw`),
+  offerDraw: (id: number) => post<DrawOffer>(`/games/${String(id)}/draw`),
   pgnUrl: (id: number) => `/api/games/${String(id)}/pgn`,
 }

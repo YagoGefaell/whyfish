@@ -17,7 +17,7 @@ from app.config import LEVEL_PRESETS, BotLevel, Settings
 from app.engine.stockfish import Engine
 from app.models.game import Game, Move, utcnow
 from app.play import rules
-from app.play.rules import Outcome, PlayerColor
+from app.play.rules import DrawDecline, Outcome, PlayerColor
 
 
 class ColorChoice(StrEnum):
@@ -121,7 +121,10 @@ class GameService:
         level: BotLevel,
         allow_undo: bool,
         allow_hint: bool,
+        fen: str | None = None,
     ) -> LoadedGame:
+        fen = fen.strip() if fen else None  # blank means the standard start
+        initial_fen = rules.validate_start_fen(fen) if fen else chess.STARTING_FEN
         if color is ColorChoice.RANDOM:
             player_color = random.choice([PlayerColor.WHITE, PlayerColor.BLACK])
         else:
@@ -131,11 +134,14 @@ class GameService:
             bot_level=level,
             allow_undo=allow_undo,
             allow_hint=allow_hint,
+            initial_fen=initial_fen,
         )
         board = chess.Board(game.initial_fen)
         new_moves: list[Move] = []
-        if player_color is PlayerColor.BLACK:
+        if board.turn != player_color.chess_color:  # the bot has the first move
             new_moves.append(await self._bot_move(board, game))
+            if (outcome := rules.game_outcome(board)) is not None:
+                _finish(game, outcome)
 
         self._repo.save(game, new_moves)
         assert game.id is not None
@@ -197,19 +203,23 @@ class GameService:
         self._repo.save(game)
         return self._repo.load(game_id)
 
-    async def offer_draw(self, game_id: int) -> tuple[bool, LoadedGame]:
+    async def offer_draw(self, game_id: int) -> tuple[DrawDecline | None, LoadedGame]:
+        """Offer a draw to the bot. Returns why it was declined, or None if accepted."""
         loaded = self._repo.load(game_id)
         game = loaded.game
         self._require_ongoing(game)
+        if rules.draw_too_early(loaded.board, self._settings.draw_min_fullmove):
+            return DrawDecline.TOO_EARLY, loaded
         score = await self._engine.evaluate(
             loaded.board, chess.engine.Limit(time=self._settings.draw_eval_time_s)
         )
         bot_color = not game.player_color.chess_color
         accepted = rules.should_accept_draw(score, bot_color, self._settings.draw_accept_max_cp)
-        if accepted:
-            _finish(game, Outcome(result=rules.DRAW, termination=rules.Termination.DRAW_AGREED))
-            self._repo.save(game)
-        return accepted, self._repo.load(game_id)
+        if not accepted:
+            return DrawDecline.POSITION, loaded
+        _finish(game, Outcome(result=rules.DRAW, termination=rules.Termination.DRAW_AGREED))
+        self._repo.save(game)
+        return None, self._repo.load(game_id)
 
     # --- Internals --------------------------------------------------------
 

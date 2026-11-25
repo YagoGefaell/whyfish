@@ -8,7 +8,7 @@ import pytest
 
 from app.config import LEVEL_PRESETS, BotLevel
 from app.play import rules
-from app.play.rules import IllegalMoveError, PlayerColor, Termination
+from app.play.rules import IllegalMoveError, InvalidFenError, PlayerColor, Termination
 
 
 class TestParseMove:
@@ -82,6 +82,50 @@ class TestPliesToUndo:
 def test_resignation_outcome() -> None:
     assert rules.resignation_outcome(PlayerColor.WHITE).result == "0-1"
     assert rules.resignation_outcome(PlayerColor.BLACK).result == "1-0"
+
+
+class TestValidateStartFen:
+    def test_valid_fen_is_normalized(self) -> None:
+        fen = "  8/P6k/8/8/8/8/8/K7 w - - 0 1 "
+        assert rules.validate_start_fen(fen) == "8/P6k/8/8/8/8/8/K7 w - - 0 1"
+
+    @pytest.mark.parametrize("fen", ["hello", "8/8/8/8 w - - 0 1", "rnbqkbnr/pppppppp w KQkq"])
+    def test_malformed(self, fen: str) -> None:
+        with pytest.raises(InvalidFenError, match="formato"):
+            rules.validate_start_fen(fen)
+
+    @pytest.mark.parametrize(
+        "fen",
+        [
+            "8/8/8/4k3/8/8/8/8 w - - 0 1",  # no white king
+            "K7/8/8/8/8/8/8/K6k w - - 0 1",  # two white kings
+            "4k3/8/8/8/8/8/8/P3K3 w - - 0 1",  # pawn on the first rank
+            "4k3/8/8/8/8/8/4R3/4K3 w - - 0 1",  # side not to move is in check
+        ],
+    )
+    def test_illegal_position(self, fen: str) -> None:
+        with pytest.raises(InvalidFenError, match="no es legal"):
+            rules.validate_start_fen(fen)
+
+    @pytest.mark.parametrize(
+        ("fen", "reason"),
+        [
+            ("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3", "jaque mate"),
+            ("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", "ahogado"),
+            ("8/8/8/4k3/8/8/8/4K3 w - - 0 1", "material insuficiente"),
+        ],
+    )
+    def test_finished_position(self, fen: str, reason: str) -> None:
+        with pytest.raises(InvalidFenError, match=f"terminada \\({reason}\\)"):
+            rules.validate_start_fen(fen)
+
+
+@pytest.mark.parametrize(
+    ("fullmove", "too_early"), [(1, True), (19, True), (20, False), (45, False)]
+)
+def test_draw_too_early(fullmove: int, too_early: bool) -> None:
+    board = chess.Board(f"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 {fullmove}")
+    assert rules.draw_too_early(board, min_fullmove=20) is too_early
 
 
 class TestShouldAcceptDraw:
@@ -160,5 +204,6 @@ class TestBuildPgn:
             io.StringIO(rules.build_pgn(self._data(initial_fen=fen, ucis=["a7a8q"], result=None)))
         )
         assert game is not None
+        assert game.headers["SetUp"] == "1"
         assert game.headers["FEN"] == fen
         assert game.end().board().piece_at(chess.A8) == chess.Piece(chess.QUEEN, chess.WHITE)

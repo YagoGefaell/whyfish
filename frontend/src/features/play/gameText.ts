@@ -39,11 +39,18 @@ export function endText(
   return termination === null ? base : `${base} ${TERMINATION_TEXT[termination]}`
 }
 
-/** Group plies into numbered rows: [[1, 'e4', 'e5'], [2, 'Nf3', undefined]]. */
-export function moveRows(sans: string[]): [number, string, string][] {
+/**
+ * Group plies into numbered rows: [[1, 'e4', 'e5'], [2, 'Nf3', '']].
+ * Numbering follows `initialFen` (fullmove number, side to move): a game starting with black
+ * to move at move 30 gives [[30, '…', 'Kg7'], ...].
+ */
+export function moveRows(sans: string[], initialFen?: string): [number, string, string][] {
+  const [, turn = 'w', , , , fullmove = '1'] = (initialFen ?? '').split(' ')
+  const first = Number.parseInt(fullmove, 10) || 1
+  const plies = turn === 'b' ? ['…', ...sans] : sans
   const rows: [number, string, string][] = []
-  for (let i = 0; i < sans.length; i += 2) {
-    rows.push([i / 2 + 1, sans[i] ?? '', sans[i + 1] ?? ''])
+  for (let i = 0; i < plies.length; i += 2) {
+    rows.push([first + i / 2, plies[i] ?? '', plies[i + 1] ?? ''])
   }
   return rows
 }
