@@ -23,24 +23,36 @@
 - Mismo flujo de análisis que una partida jugada (las importadas siempre son analizables).
 
 ### 1.3 Revisión (Game Review)
-- Barra de evaluación + gráfica de evaluación a lo largo de la partida (clic → ir a jugada).
-- Lista de jugadas con símbolo e icono de color por clasificación.
-- Resumen: precisión por jugador, recuento por categoría y **hasta 5 momentos clave**
-  destacados para revisar primero (ver §3.4).
-- Al seleccionar una jugada:
-  - Flecha de la jugada hecha y de la mejor jugada.
+- **Mientras se analiza**, el tablero ya muestra la partida y el panel la barra de progreso.
+- **Primero el Resumen:** precisión de cada jugador (la del usuario destacada), tabla de
+  categorías con insignia y recuento por jugador y **hasta 5 momentos clave** (ver §3.4). El
+  tablero muestra la posición final. Botón principal **"Empezar revisión"** → jugada 1.
+- **Tablero:** franjas de jugador encima y debajo (el usuario siempre abajo); barra de
+  evaluación que gira con el tablero; casillas de origen (~30 %) y destino (~55 %) con el color
+  de la clasificación e insignia SVG en la esquina del destino. Las piezas se deslizan al
+  avanzar o retroceder paso a paso; los saltos largos van sin animación.
+- **Gráfica de evaluación** (clic → ir a la jugada) con puntos en !!, ?, ?? y ✗ y una línea en
+  la jugada actual.
+- **Lista de jugadas** en dos columnas, con insignia solo en !!, !, ?!, ?, ?? y ✗.
+- **Navegación:** ⏮ ◀ ▶ ⏭, ← → Inicio Fin, **"Siguiente error"** (tecla N: siguiente ?!, ?, ??
+  o ✗ del usuario) y ayuda de atajos.
+- **Panel del coach** al seleccionar una jugada:
+  - Insignia + frase corta ("Nf3 es un error") y debajo la explicación.
+  - **Mejor jugada automática:** si la jugada hecha no es la mejor (excelente, buena, ?!, ?, ??,
+    ✗) se muestran la flecha verde en el tablero y "La mejor era X"; **"Ver línea"** despliega
+    su continuación clicable. Si es la mejor (★, !, !!, libro) no se muestra ninguna alternativa.
+  - Fila de acciones que crece por fases: **"Profundizar"** (nivel 2, Fase 4) y
+    **"Pruébalo tú"** (en errores: repetir la posición e intentar encontrar la mejor jugada).
+  - "Detalles del motor" plegado (recuerda su estado): % de victoria, Δ, evaluación y líneas.
   - **Nivel 1 — explicación simple** (1–2 frases, siempre visible).
   - **Nivel 2 — "Profundizar"**: amenazas, variante principal comentada, comparación con
     la mejor jugada, conceptos implicados.
   - **Nivel 3 — "Pregunta al coach"**: chat sobre esa posición ("¿y si juego Nxe5?").
-  - **"Pruébalo tú"**: en errores, repetir la posición e intentar encontrar la mejor jugada antes de verla.
-  - Explorar variantes en el tablero (salir de la línea de la partida y volver), con
-    evaluación del motor (`POST /api/analysis/evaluate`, ~0,3 s, con debounce) en la barra y
-    flecha con la mejor jugada.
-- Navegación con ← → Inicio Fin, clic en la gráfica, en la lista y en los momentos clave.
-  Icono de la clasificación sobre la casilla de destino de la jugada seleccionada.
-- Diseño adaptable: en móvil, tablero a todo el ancho, barra de evaluación horizontal y el
-  resto en pestañas (Jugada / Jugadas / Resumen).
+- **Explorar variantes** en el tablero (salir de la línea de la partida y volver), con
+  evaluación del motor (`POST /api/analysis/evaluate`, ~0,3 s, con debounce) en la barra y
+  flecha con la mejor jugada.
+- **Diseño adaptable:** en escritorio, tablero y gráfica caben en el alto de la ventana; en
+  móvil, tablero a todo el ancho, barra horizontal y el panel debajo con pestañas.
 
 ## 2. Análisis con motor
 - Por cada posición de la partida: evaluación con MultiPV = 3 a profundidad/tiempo

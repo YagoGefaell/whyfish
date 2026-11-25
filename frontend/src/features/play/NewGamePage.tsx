@@ -49,7 +49,7 @@ export function NewGamePage() {
   }
 
   return (
-    <form onSubmit={submit} className="flex max-w-md flex-col gap-5">
+    <form onSubmit={submit} className="panel mx-auto flex w-full max-w-lg flex-col gap-5 p-6">
       <h2 className="text-xl font-semibold">Nueva partida</h2>
 
       <fieldset>
@@ -79,7 +79,7 @@ export function NewGamePage() {
           onChange={(e) => {
             setLevel(e.target.value as BotLevel)
           }}
-          className="rounded border border-gray-300 px-2 py-1"
+          className="field"
         >
           {levels.map((lvl) => (
             <option key={lvl.id} value={lvl.id}>
@@ -127,15 +127,15 @@ export function NewGamePage() {
           placeholder="Vacío = posición inicial normal"
           spellCheck={false}
           aria-describedby="start-fen-help"
-          className="rounded border border-gray-300 px-2 py-1 font-mono text-sm"
+          className="field font-mono text-sm"
         />
-        <span id="start-fen-help" className="text-xs text-gray-500">
+        <span id="start-fen-help" className="text-xs text-muted">
           Si le toca mover al bot en esa posición, juega él primero.
         </span>
       </div>
 
       {error && (
-        <p role="alert" className="text-red-600">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}
@@ -143,7 +143,7 @@ export function NewGamePage() {
       <button
         type="submit"
         disabled={submitting || levels.length === 0}
-        className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+        className="btn-primary py-2.5 text-base"
       >
         {submitting ? 'Creando…' : 'Empezar'}
       </button>

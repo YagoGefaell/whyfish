@@ -24,8 +24,8 @@ export function HistoryPage() {
       })
   }, [])
 
-  if (error) return <p className="text-red-600">{error}</p>
-  if (!games) return <p className="text-gray-500">Cargando…</p>
+  if (error) return <p className="text-danger">{error}</p>
+  if (!games) return <p className="text-muted">Cargando…</p>
   if (games.length === 0) {
     return (
       <p>
@@ -36,11 +36,12 @@ export function HistoryPage() {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="panel overflow-x-auto p-2">
+      <h2 className="px-3 pt-2 pb-3 text-lg font-semibold">Historial</h2>
       <table className="w-full text-left text-sm">
-        <thead className="border-b text-gray-500">
+        <thead className="border-b border-line text-muted">
           <tr>
-            <th className="py-2">Fecha</th>
+            <th className="px-3 py-2 font-medium">Fecha</th>
             <th>Partida</th>
             <th>Tu color</th>
             <th>Resultado</th>
@@ -53,12 +54,12 @@ export function HistoryPage() {
           {games.map((g) => {
             const ongoing = g.result === null
             return (
-              <tr key={g.id} className="border-b">
-                <td className="py-2">{new Date(g.created_at).toLocaleString('es-ES')}</td>
+              <tr key={g.id} className="border-b border-line">
+                <td className="px-3 py-2.5">{new Date(g.created_at).toLocaleString('es-ES')}</td>
                 <td>
                   {title(g)}
                   {g.source === 'imported' && (
-                    <span className="ml-2 rounded bg-gray-100 px-1 text-xs text-gray-600">
+                    <span className="ml-2 rounded-md bg-panel-2 px-1.5 py-0.5 text-xs text-muted">
                       importada
                     </span>
                   )}
@@ -68,14 +69,17 @@ export function HistoryPage() {
                 <td>{Math.ceil(g.move_count / 2)}</td>
                 <td>
                   {ongoing ? (
-                    <span className="text-gray-400">—</span>
+                    <span className="text-muted">—</span>
                   ) : (
                     <AnalyzeButton game={g} compact />
                   )}
                 </td>
                 <td>
                   {g.source === 'played' && (
-                    <Link className="text-blue-700 hover:underline" to={`/play/${String(g.id)}`}>
+                    <Link
+                      className="text-accent-strong hover:underline"
+                      to={`/play/${String(g.id)}`}
+                    >
                       {ongoing ? 'Continuar' : 'Ver partida'}
                     </Link>
                   )}

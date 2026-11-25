@@ -4,15 +4,16 @@ import { mockApi } from '../test/fetchMock'
 import { EngineStatus } from './EngineStatus'
 
 describe('EngineStatus', () => {
-  it('shows the engine name when the backend is healthy', async () => {
+  it('shows nothing when the engine is ready', async () => {
     mockApi([
       {
         path: '/api/health',
         body: { status: 'ok', engine: { status: 'ok', name: 'Stockfish 19', detail: null } },
       },
     ])
-    render(<EngineStatus />)
-    expect(await screen.findByText('Motor listo: Stockfish 19')).toBeInTheDocument()
+    const { container } = render(<EngineStatus />)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('shows the reason when the engine is unavailable', async () => {

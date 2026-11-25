@@ -3,6 +3,7 @@ import { Chessboard, type PieceDropHandlerArgs, type PieceHandlerArgs } from 're
 import type { Color } from '../../api/games'
 import { checkedKingSquare, resolveDrop, type PromotionPiece } from './moves'
 import { PromotionDialog } from './PromotionDialog'
+import { BOARD_COLORS } from './theme'
 
 const LAST_MOVE_STYLE: CSSProperties = { backgroundColor: 'rgba(255, 213, 79, 0.55)' }
 const HINT_STYLE: CSSProperties = { boxShadow: 'inset 0 0 0 4px rgba(37, 99, 235, 0.9)' }
@@ -72,7 +73,7 @@ export function Board({
   }
 
   return (
-    <div className="relative w-full max-w-[560px]">
+    <div className="relative w-full">
       <Chessboard
         options={{
           id: 'play-board',
@@ -83,6 +84,7 @@ export function Board({
           onPieceDrop,
           squareStyles,
           allowDrawingArrows: true,
+          ...BOARD_COLORS,
         }}
       />
       {pendingPromotion && (

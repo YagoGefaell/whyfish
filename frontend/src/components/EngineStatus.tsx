@@ -1,47 +1,42 @@
+import { TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { fetchHealth, type HealthResponse } from '../api/health'
+import { fetchHealth } from '../api/health'
 
-type State =
-  | { kind: 'loading' }
-  | { kind: 'loaded'; health: HealthResponse }
-  | { kind: 'error'; message: string }
-
+/** Discreet header warning, shown only when the engine (or the server) is not available. */
 export function EngineStatus() {
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [problem, setProblem] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     fetchHealth(controller.signal)
       .then((health) => {
-        setState({ kind: 'loaded', health })
+        const { engine } = health
+        setProblem(
+          engine.status === 'ok'
+            ? null
+            : `Motor no disponible: ${engine.detail ?? 'motivo desconocido'}`,
+        )
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        setState({ kind: 'error', message: error instanceof Error ? error.message : 'Error' })
+        setProblem(
+          `No se pudo contactar con el servidor (${error instanceof Error ? error.message : 'error'}).`,
+        )
       })
     return () => {
       controller.abort()
     }
   }, [])
 
-  switch (state.kind) {
-    case 'loading':
-      return <span className="text-gray-500">Comprobando el motor…</span>
-    case 'error':
-      return (
-        <span className="text-red-600">
-          No se pudo contactar con el servidor ({state.message}).
-        </span>
-      )
-    case 'loaded': {
-      const { engine } = state.health
-      return engine.status === 'ok' ? (
-        <span className="text-green-700">Motor listo: {engine.name}</span>
-      ) : (
-        <span className="text-red-600">
-          Motor no disponible: {engine.detail ?? 'motivo desconocido'}
-        </span>
-      )
-    }
-  }
+  if (!problem) return null
+  return (
+    <span
+      role="status"
+      className="inline-flex items-center gap-1.5 text-sm text-[#f7c631]"
+      title={problem}
+    >
+      <TriangleAlert size={15} aria-hidden="true" />
+      <span className="max-w-[40ch] truncate">{problem}</span>
+    </span>
+  )
 }

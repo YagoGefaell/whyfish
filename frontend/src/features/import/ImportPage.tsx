@@ -70,7 +70,7 @@ export function ImportPage() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-4">
+    <form onSubmit={onSubmit} className="panel mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
       <h2 className="text-xl font-semibold">Importar partida (PGN)</h2>
       <label className="flex flex-col gap-1">
         <span className="font-medium">Pega el PGN</span>
@@ -83,7 +83,7 @@ export function ImportPage() {
           rows={10}
           spellCheck={false}
           placeholder={'[White "…"]\n[Black "…"]\n\n1. e4 e5 2. Nf3 …'}
-          className="rounded border border-gray-300 p-2 font-mono text-sm"
+          className="field font-mono text-sm"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -114,7 +114,7 @@ export function ImportPage() {
         <div
           role="alertdialog"
           aria-label="¿Quién eras tú?"
-          className="rounded border border-amber-300 bg-amber-50 p-3"
+          className="rounded-xl border border-[#f7c631]/40 bg-[#f7c631]/10 p-3"
         >
           <p className="mb-2 font-medium">No he podido deducir tu color. ¿Quién eras tú?</p>
           <div className="flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ export function ImportPage() {
               onClick={() => {
                 submit('white')
               }}
-              className="rounded border bg-white px-3 py-1 hover:bg-gray-100"
+              className="btn"
             >
               Blancas{question.white ? `: ${question.white}` : ''}
             </button>
@@ -134,7 +134,7 @@ export function ImportPage() {
               onClick={() => {
                 submit('black')
               }}
-              className="rounded border bg-white px-3 py-1 hover:bg-gray-100"
+              className="btn"
             >
               Negras{question.black ? `: ${question.black}` : ''}
             </button>
@@ -143,16 +143,12 @@ export function ImportPage() {
       )}
 
       {error && (
-        <p role="alert" className="text-red-600">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={busy || pgn.trim() === ''}
-        className="self-start rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy || pgn.trim() === ''} className="btn-primary self-start">
         {busy ? 'Importando…' : 'Importar y analizar'}
       </button>
     </form>

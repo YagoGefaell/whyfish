@@ -1,94 +1,131 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Review } from '../../api/analysis'
-import type { GameState } from '../../api/games'
-import { CLASSIFICATIONS, evalLabel, moveNumber } from './classification'
+import { X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { MoveReview, Review } from '../../api/analysis'
+import type { Color, GameState } from '../../api/games'
+import { CoachPanel } from './CoachPanel'
+import { CLASSIFICATIONS, evalLabel, moveNumber, showsAlternative } from './classification'
 import { EvalBar } from './EvalBar'
 import { EvalGraph } from './EvalGraph'
-import { MoveDetail } from './MoveDetail'
-import { MoveTable } from './MoveTable'
+import { MoveList, type ListMove } from './MoveList'
 import { playerNames } from './names'
-import { ReviewBoard, type BoardArrow } from './ReviewBoard'
-import { ReviewSummary } from './ReviewSummary'
+import { NavBar } from './NavBar'
+import { ReviewBoard, type BoardArrow, type ShownMove } from './ReviewBoard'
+import { ColorDot, SummaryPanel } from './SummaryPanel'
 import { useEvaluation } from './useEvaluation'
 import { fenAfter, fenStart, mainLineFens, sansToUcis, ucisToSans } from './variation'
 
-const BEST_ARROW = '#2f9e44'
+// Intense green; react-chessboard applies the 0.8 opacity (ReviewBoard ARROW_OPTIONS).
+const BEST_ARROW = '#16a34a'
 
 interface Exploration {
-  /** Main-line position the variation starts from. */
-  base: number
+  base: number // main-line position the variation starts from
   moves: string[] // UCI
-  /** How many of `moves` are shown (0 = the base position). */
-  index: number
+  index: number // how many of `moves` are shown (0 = the base position)
 }
 
-type Tab = 'move' | 'moves' | 'summary'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'move', label: 'Jugada' },
-  { id: 'moves', label: 'Jugadas' },
-  { id: 'summary', label: 'Resumen' },
-]
+type Tab = 'summary' | 'review'
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-export function ReviewView({ game, review }: { game: GameState; review: Review }) {
-  const fens = useMemo(
-    () =>
-      mainLineFens(
-        game.initial_fen,
-        review.moves.map((m) => m.uci),
-      ),
-    [game.initial_fen, review.moves],
-  )
-  const last = fens.length - 1
-  const [position, setPosition] = useState(0)
-  const [exploration, setExploration] = useState<Exploration | null>(null)
-  const [tab, setTab] = useState<Tab>('move')
-  const orientation = review.perspective
+const squares = (uci: string) => ({ from: uci.slice(0, 2), to: uci.slice(2, 4) })
 
-  const select = useCallback((p: number) => {
+interface Props {
+  game: GameState
+  /** null while the game is being analysed (or was never analysed). */
+  review: Review | null
+  /** Shown in the panel instead of the review while there is none (progress, errors...). */
+  status?: ReactNode
+  /** Game info line (event · date · result · opening), aligned with the board. */
+  meta?: ReactNode
+}
+
+export function ReviewView({ game, review, status, meta }: Props) {
+  const moves = useMemo(() => game.moves.map((m) => m.uci), [game.moves])
+  const fens = useMemo(() => mainLineFens(game.initial_fen, moves), [game.initial_fen, moves])
+  const last = fens.length - 1
+  const orientation = review?.perspective ?? game.player_color
+  const [position, setPosition] = useState(0)
+  const [animate, setAnimate] = useState(false)
+  const [exploration, setExploration] = useState<Exploration | null>(null)
+  const [tab, setTab] = useState<Tab>('summary')
+
+  /** Long jump: no animation, leaves any variation, goes to the review tab. */
+  const jump = useCallback((p: number) => {
+    setAnimate(false)
     setExploration(null)
     setPosition(p)
+    setTab('review')
   }, [])
 
-  const back = useCallback(() => {
-    if (exploration) {
-      if (exploration.index > 0) setExploration({ ...exploration, index: exploration.index - 1 })
-      else select(exploration.base)
-    } else setPosition((p) => Math.max(0, p - 1))
-  }, [exploration, select])
+  const step = useCallback(
+    (delta: 1 | -1) => {
+      setAnimate(true)
+      setTab('review')
+      if (exploration) {
+        const index = exploration.index + delta
+        if (index < 0) {
+          setExploration(null)
+          setPosition(exploration.base)
+        } else {
+          setExploration({ ...exploration, index: Math.min(exploration.moves.length, index) })
+        }
+      } else {
+        setPosition((p) => Math.min(last, Math.max(0, p + delta)))
+      }
+    },
+    [exploration, last],
+  )
 
-  const forward = useCallback(() => {
-    if (exploration) {
-      setExploration({
-        ...exploration,
-        index: Math.min(exploration.moves.length, exploration.index + 1),
-      })
-    } else setPosition((p) => Math.min(last, p + 1))
-  }, [exploration, last])
+  const nextError = useMemo(() => {
+    if (!review) return null
+    const from = exploration ? exploration.base : position
+    const target = review.moves.find(
+      (m) =>
+        m.ply >= from &&
+        m.color === review.perspective &&
+        CLASSIFICATIONS[m.classification].isError,
+    )
+    return target ? target.ply + 1 : null
+  }, [review, exploration, position])
+
+  const goNextError = useMemo(
+    () =>
+      nextError === null
+        ? null
+        : () => {
+            jump(nextError)
+          },
+    [nextError, jump],
+  )
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isTyping(event.target) || event.altKey || event.ctrlKey || event.metaKey) return
-      const actions: Record<string, () => void> = {
-        ArrowLeft: back,
-        ArrowRight: forward,
+      const actions: Record<string, (() => void) | null> = {
+        ArrowLeft: () => {
+          step(-1)
+        },
+        ArrowRight: () => {
+          step(1)
+        },
         Home: () => {
-          if (exploration) setExploration({ ...exploration, index: 0 })
-          else setPosition(0)
+          jump(0)
         },
         End: () => {
-          if (exploration) setExploration({ ...exploration, index: exploration.moves.length })
-          else setPosition(last)
+          jump(last)
         },
-        Escape: () => {
-          if (exploration) select(exploration.base)
-        },
+        n: goNextError,
+        N: goNextError,
+        Escape: exploration
+          ? () => {
+              jump(exploration.base)
+            }
+          : null,
       }
-      const action = Object.hasOwn(actions, event.key) ? actions[event.key] : undefined
+      const action = Object.hasOwn(actions, event.key) ? actions[event.key] : null
       if (action) {
         event.preventDefault()
         action()
@@ -98,14 +135,15 @@ export function ReviewView({ game, review }: { game: GameState; review: Review }
     return () => {
       window.removeEventListener('keydown', onKey)
     }
-  }, [back, forward, exploration, last, select])
+  }, [step, jump, last, goNextError, exploration])
 
   const onBoardMove = (uci: string) => {
+    setAnimate(false) // the piece was already dragged
     if (exploration) {
-      const moves = [...exploration.moves.slice(0, exploration.index), uci]
-      setExploration({ ...exploration, moves, index: moves.length })
-    } else if (review.moves[position]?.uci === uci) {
-      setPosition(position + 1) // the game move: just advance
+      const next = [...exploration.moves.slice(0, exploration.index), uci]
+      setExploration({ ...exploration, moves: next, index: next.length })
+    } else if (moves[position] === uci) {
+      setPosition(position + 1)
     } else {
       setExploration({ base: position, moves: [uci], index: 1 })
     }
@@ -113,63 +151,88 @@ export function ReviewView({ game, review }: { game: GameState; review: Review }
 
   const onLine = (from: 'before' | 'after', sans: string[], index: number) => {
     const base = from === 'before' ? position - 1 : position
-    const moves = sansToUcis(fens[base] ?? game.initial_fen, sans)
-    setExploration({ base, moves, index: Math.min(index + 1, moves.length) })
+    const line = sansToUcis(fens[base] ?? game.initial_fen, sans)
+    setAnimate(false)
+    setExploration({ base, moves: line, index: Math.min(index + 1, line.length) })
   }
 
-  const exploring = exploration !== null
+  // The summary tab shows the final position of the game.
+  const onSummary = review !== null && tab === 'summary' && !exploration
+  const shownPosition = onSummary ? last : position
   const baseFen = exploration ? (fens[exploration.base] ?? game.initial_fen) : null
   const shownMoves = exploration ? exploration.moves.slice(0, exploration.index) : []
   const fen =
-    exploration && baseFen ? fenAfter(baseFen, shownMoves) : (fens[position] ?? game.initial_fen)
+    exploration && baseFen
+      ? fenAfter(baseFen, shownMoves)
+      : (fens[shownPosition] ?? game.initial_fen)
   const { evaluation, loading } = useEvaluation(
     exploration && baseFen ? { fen: baseFen, moves: shownMoves } : null,
   )
 
-  const move = !exploring && position > 0 ? (review.moves[position - 1] ?? null) : null
-  const meta = move ? CLASSIFICATIONS[move.classification] : null
+  const reviewed: MoveReview | null =
+    !exploration && review && shownPosition > 0 ? (review.moves[shownPosition - 1] ?? null) : null
   const arrows: BoardArrow[] = []
-  let highlight: { from: string; to: string; color: string } | null = null
-  if (move && meta) {
-    highlight = { from: move.uci.slice(0, 2), to: move.uci.slice(2, 4), color: meta.color }
-    arrows.push({ from: move.uci.slice(0, 2), to: move.uci.slice(2, 4), color: meta.color })
-    if (move.best_uci && move.best_uci !== move.uci) {
-      arrows.push({
-        from: move.best_uci.slice(0, 2),
-        to: move.best_uci.slice(2, 4),
-        color: BEST_ARROW,
-      })
-    }
-  }
+  let shownMove: ShownMove | null = null
   if (exploration) {
-    const lastMove = shownMoves.at(-1)
-    if (lastMove)
-      highlight = { from: lastMove.slice(0, 2), to: lastMove.slice(2, 4), color: '#f0c419' }
-    if (evaluation?.best_uci) {
-      const b = evaluation.best_uci
-      arrows.push({ from: b.slice(0, 2), to: b.slice(2, 4), color: BEST_ARROW })
+    const lastUci = shownMoves.at(-1)
+    if (lastUci) shownMove = { ...squares(lastUci), classification: null }
+    if (evaluation?.best_uci) arrows.push({ ...squares(evaluation.best_uci), color: BEST_ARROW })
+  } else if (shownPosition > 0) {
+    const uci = moves[shownPosition - 1]
+    if (uci) shownMove = { ...squares(uci), classification: reviewed?.classification ?? null }
+    if (reviewed?.best_uci && showsAlternative(reviewed)) {
+      arrows.push({ ...squares(reviewed.best_uci), color: BEST_ARROW })
     }
   }
-  const badge =
-    move && meta
-      ? { square: move.uci.slice(2, 4), mark: meta.mark, color: meta.color, label: meta.label }
-      : null
-  const barEval = exploring ? (evaluation?.white ?? null) : (review.evals[position] ?? null)
+  const barEval = exploration ? (evaluation?.white ?? null) : (review?.evals[shownPosition] ?? null)
   const names = playerNames(game)
   const start = fenStart(game.initial_fen)
+  const listMoves: ListMove[] = game.moves.map((m) => ({
+    ply: m.ply,
+    san: m.san,
+    classification: review?.moves[m.ply]?.classification ?? null,
+  }))
 
-  const navButton =
-    'rounded border border-gray-300 px-3 py-1 text-lg hover:bg-gray-100 disabled:opacity-40'
-  const panel = (id: Tab) => `${tab === id ? '' : 'hidden'} lg:block`
+  const nav = (
+    <NavBar
+      onFirst={() => {
+        jump(0)
+      }}
+      onBack={() => {
+        step(-1)
+      }}
+      onForward={() => {
+        step(1)
+      }}
+      onLast={() => {
+        jump(last)
+      }}
+      onNextError={review ? goNextError : null}
+    />
+  )
+
+  const accuracyOf = (color: Color) => review?.[color].accuracy ?? null
+  const topColor: Color = orientation === 'white' ? 'black' : 'white'
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,560px)_1fr]">
-      <div className="flex min-w-0 flex-col gap-2">
+    <div className="flex flex-col gap-4 lg:flex-row lg:justify-center">
+      {/*
+        Board column: game info line, player strips, eval bar (2.25rem) + board. On desktop the
+        board takes the whole available height (the width follows it); the graph is in the panel.
+      */}
+      <div className="flex w-full min-w-0 flex-col gap-1.5 lg:w-[min(calc(100vw-26.75rem),calc(100dvh-7.25rem))] lg:shrink-0">
+        {meta && <div className="truncate text-sm text-muted lg:ml-9">{meta}</div>}
         <EvalBar
           evaluation={barEval}
           orientation="horizontal"
           boardOrientation={orientation}
-          className="lg:hidden"
+          className="my-1 lg:hidden"
+        />
+        <PlayerStrip
+          name={names[topColor]}
+          color={topColor}
+          isUser={false}
+          accuracy={accuracyOf(topColor)}
         />
         <div className="flex gap-2">
           <EvalBar
@@ -183,143 +246,216 @@ export function ReviewView({ game, review }: { game: GameState; review: Review }
               fen={fen}
               orientation={orientation}
               arrows={arrows}
-              highlight={highlight}
-              badge={badge}
+              shownMove={shownMove}
+              animate={animate}
               onMove={onBoardMove}
             />
           </div>
         </div>
-        <div className="flex items-center justify-center gap-2" aria-label="Navegación">
-          <button
-            type="button"
-            className={navButton}
-            aria-label="Principio"
-            onClick={() => {
-              select(0)
-            }}
-          >
-            ⏮
-          </button>
-          <button type="button" className={navButton} aria-label="Anterior" onClick={back}>
-            ◀
-          </button>
-          <button type="button" className={navButton} aria-label="Siguiente" onClick={forward}>
-            ▶
-          </button>
-          <button
-            type="button"
-            className={navButton}
-            aria-label="Final"
-            onClick={() => {
-              select(last)
-            }}
-          >
-            ⏭
-          </button>
-        </div>
-        {exploration && baseFen && (
-          <div
-            role="status"
-            aria-label="Variante explorada"
-            className="rounded border border-amber-300 bg-amber-50 p-2 text-sm"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">
-                Explorando una variante desde{' '}
-                {exploration.base === 0
-                  ? 'la posición inicial'
-                  : `${moveNumber(exploration.base - 1)} ${review.moves[exploration.base - 1]?.san ?? ''}`}
-              </span>
-              <button
-                type="button"
-                className="ml-auto rounded bg-amber-600 px-2 py-0.5 text-white hover:bg-amber-700"
-                onClick={() => {
-                  select(exploration.base)
-                }}
-              >
-                Volver a la partida
-              </button>
-            </div>
-            <p className="mt-1 font-mono">
-              {ucisToSans(baseFen, exploration.moves).map((san, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setExploration({ ...exploration, index: i + 1 })
-                  }}
-                  className={`mr-1 rounded px-1 ${i + 1 === exploration.index ? 'bg-amber-200 font-semibold' : 'hover:bg-amber-100'}`}
-                >
-                  {san}
-                </button>
-              ))}
-            </p>
-            <p className="mt-1 text-gray-700" aria-live="polite">
-              {loading || !evaluation
-                ? 'Evaluando…'
-                : evaluation.terminal
-                  ? { checkmate: 'Jaque mate.', stalemate: 'Ahogado: tablas.', draw: 'Tablas.' }[
-                      evaluation.terminal
-                    ]
-                  : `Evaluación ${evalLabel(evaluation.white)} · mejor línea: ${
-                      evaluation.lines.at(0)?.san.join(' ') ?? evaluation.best_san ?? '–'
-                    }`}
-            </p>
-          </div>
-        )}
-        <EvalGraph
-          evals={review.evals}
-          moves={review.moves}
-          keyMoments={review.key_moments}
-          position={exploration ? exploration.base : position}
-          onSelect={select}
+        <PlayerStrip
+          name={names[orientation]}
+          color={orientation}
+          isUser
+          accuracy={accuracyOf(orientation)}
         />
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
-        <div role="tablist" aria-label="Secciones" className="flex gap-1 border-b lg:hidden">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => {
-                setTab(t.id)
-              }}
-              className={`px-3 py-1.5 text-sm ${tab === t.id ? 'border-b-2 border-blue-700 font-semibold text-blue-800' : 'text-gray-600'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <section aria-label="Detalle de la jugada" className={panel('move')}>
-          {exploring ? (
-            <p className="text-sm text-gray-500">
-              Estás explorando una variante. Vuelve a la partida para ver la clasificación.
-            </p>
-          ) : (
-            <MoveDetail move={move} evalAfter={review.evals[position] ?? null} onLine={onLine} />
-          )}
-        </section>
-        <section aria-label="Lista de jugadas" className={panel('moves')}>
-          <MoveTable
-            moves={review.moves}
-            position={exploration ? exploration.base : position}
-            onSelect={select}
-            firstMoveNumber={start.moveNumber}
-            blackStarts={start.blackToMove}
-          />
-        </section>
-        <section aria-label="Resumen de la partida" className={panel('summary')}>
-          <ReviewSummary
-            review={review}
-            whiteName={names.white}
-            blackName={names.black}
-            onSelect={select}
-          />
+      {/* Panel: same height as the board column on desktop; graph on top, nav at the bottom. */}
+      <div className="relative min-w-0 lg:w-[380px] lg:shrink-0 xl:w-[400px]">
+        <section
+          aria-label="Panel de revisión"
+          className="panel flex flex-col lg:absolute lg:inset-0"
+        >
+          <div className="order-first border-b border-line p-3 lg:order-last lg:border-t lg:border-b-0">
+            {nav}
+          </div>
+          <div className="p-3 pb-0">
+            {review ? (
+              <EvalGraph
+                evals={review.evals}
+                moves={review.moves}
+                position={exploration ? exploration.base : shownPosition}
+                onSelect={jump}
+                className="h-20 lg:h-24"
+              />
+            ) : (
+              <div className="h-20 rounded-lg bg-panel-2 lg:h-24" aria-hidden="true" />
+            )}
+          </div>
+          {review ? (
+            <div role="tablist" aria-label="Secciones" className="flex border-b border-line px-2">
+              {(
+                [
+                  ['summary', 'Resumen'],
+                  ['review', 'Revisión'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => {
+                    setTab(id)
+                  }}
+                  className={`flex-1 border-b-2 px-3 py-2.5 text-sm font-semibold ${
+                    tab === id
+                      ? 'border-accent text-fg'
+                      : 'border-transparent text-muted hover:text-fg'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div
+            className={`flex min-h-0 flex-1 flex-col gap-4 p-4 ${
+              review && tab === 'summary' ? 'overflow-y-auto' : 'lg:overflow-hidden'
+            }`}
+          >
+            {!review && status}
+            {review && tab === 'summary' && (
+              <SummaryPanel
+                review={review}
+                names={names}
+                onStart={() => {
+                  jump(1)
+                }}
+                onSelect={jump}
+              />
+            )}
+            {review && tab === 'review' && (
+              <div className="shrink-0 lg:max-h-[68%] lg:overflow-y-auto">
+                {exploration && baseFen ? (
+                  <ExplorationCard
+                    base={
+                      exploration.base === 0
+                        ? 'la posición inicial'
+                        : `${moveNumber(exploration.base - 1)} ${game.moves[exploration.base - 1]?.san ?? ''}`
+                    }
+                    sans={ucisToSans(baseFen, exploration.moves)}
+                    index={exploration.index}
+                    onPick={(i) => {
+                      setAnimate(false)
+                      setExploration({ ...exploration, index: i + 1 })
+                    }}
+                    onExit={() => {
+                      jump(exploration.base)
+                    }}
+                    text={
+                      loading || !evaluation
+                        ? 'Evaluando…'
+                        : evaluation.terminal
+                          ? {
+                              checkmate: 'Jaque mate.',
+                              stalemate: 'Ahogado: tablas.',
+                              draw: 'Tablas.',
+                            }[evaluation.terminal]
+                          : `Evaluación ${evalLabel(evaluation.white)} · mejor línea: ${evaluation.lines.at(0)?.san.join(' ') ?? evaluation.best_san ?? '–'}`
+                    }
+                  />
+                ) : (
+                  <CoachPanel
+                    key={position}
+                    move={reviewed}
+                    evalAfter={review.evals[position] ?? null}
+                    onLine={onLine}
+                  />
+                )}
+              </div>
+            )}
+            {(!review || tab === 'review') && (
+              <div className="flex min-h-0 flex-1 flex-col border-t border-line pt-3">
+                <MoveList
+                  moves={listMoves}
+                  position={exploration ? exploration.base : position}
+                  onSelect={jump}
+                  firstMoveNumber={start.moveNumber}
+                  blackStarts={start.blackToMove}
+                />
+              </div>
+            )}
+          </div>
         </section>
       </div>
+    </div>
+  )
+}
+
+/** Player name with a colour dot; the user is always at the bottom. */
+function PlayerStrip({
+  name,
+  color,
+  isUser,
+  accuracy,
+}: {
+  name: string
+  color: Color
+  isUser: boolean
+  accuracy: number | null
+}) {
+  return (
+    <div
+      data-testid={isUser ? 'player-bottom' : 'player-top'}
+      className="flex h-6 items-center gap-2 text-sm font-semibold lg:ml-9"
+    >
+      <ColorDot color={color} />
+      <span className="truncate">{name}</span>
+      {isUser && name !== 'Tú' && (
+        <span className="rounded bg-panel-2 px-1.5 text-xs font-medium text-muted">tú</span>
+      )}
+      {accuracy !== null && (
+        <span
+          className="tabular ml-auto rounded-md bg-panel-2 px-2 text-xs font-semibold"
+          title="Precisión"
+          data-testid={isUser ? 'player-bottom-accuracy' : 'player-top-accuracy'}
+        >
+          {accuracy.toFixed(1)}
+          <span className="sr-only"> de precisión</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ExplorationCard(props: {
+  base: string
+  sans: string[]
+  index: number
+  text: string
+  onPick: (i: number) => void
+  onExit: () => void
+}) {
+  return (
+    <div
+      role="status"
+      aria-label="Variante explorada"
+      className="flex flex-col gap-2 rounded-lg border border-[#f7c631]/40 bg-[#f7c631]/10 p-3 text-sm"
+    >
+      <div className="flex items-center gap-2">
+        <span className="font-semibold">Variante desde {props.base}</span>
+        <button type="button" className="btn ml-auto" onClick={props.onExit}>
+          <X size={14} /> Volver a la partida
+        </button>
+      </div>
+      <p className="tabular flex flex-wrap gap-1">
+        {props.sans.map((san, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => {
+              props.onPick(i)
+            }}
+            className={`rounded-md px-1.5 py-0.5 font-medium ${i + 1 === props.index ? 'bg-[#f7c631]/30' : 'hover:bg-white/10'}`}
+          >
+            {san}
+          </button>
+        ))}
+      </p>
+      <p className="text-muted" aria-live="polite">
+        {props.text}
+      </p>
     </div>
   )
 }

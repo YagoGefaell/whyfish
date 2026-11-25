@@ -31,6 +31,12 @@ export const FOOLS_GAME: GameState = gameState({
   fen: 'rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3',
   move_count: 4,
   analysis_status: 'done',
+  moves: [
+    { ply: 0, uci: 'f2f3', san: 'f3', by_bot: false },
+    { ply: 1, uci: 'e7e5', san: 'e5', by_bot: true },
+    { ply: 2, uci: 'g2g4', san: 'g4', by_bot: false },
+    { ply: 3, uci: 'd8h4', san: 'Qh4#', by_bot: true },
+  ],
 })
 
 export const FOOLS_REVIEW: Review = {

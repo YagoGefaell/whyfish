@@ -4,9 +4,8 @@ import { analysisApi } from '../../api/analysis'
 import { ApiError } from '../../api/client'
 import type { GameSummary } from '../../api/games'
 
-const PRIMARY =
-  'rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50'
-const SECONDARY = 'rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100'
+const PRIMARY = 'btn-primary'
+const SECONDARY = 'btn'
 
 /** "Analizar partida" (starts the analysis and opens the review) or "Ver revisión". */
 export function AnalyzeButton({ game, compact = false }: { game: GameSummary; compact?: boolean }) {
@@ -17,14 +16,14 @@ export function AnalyzeButton({ game, compact = false }: { game: GameSummary; co
 
   if (game.analysis_status === 'done') {
     return (
-      <Link className={compact ? 'text-blue-700 hover:underline' : SECONDARY} to={reviewUrl}>
+      <Link className={compact ? 'text-accent-strong hover:underline' : SECONDARY} to={reviewUrl}>
         Ver revisión
       </Link>
     )
   }
   if (game.analysis_status === 'running' || game.analysis_status === 'pending') {
     return (
-      <Link className={compact ? 'text-blue-700 hover:underline' : SECONDARY} to={reviewUrl}>
+      <Link className={compact ? 'text-accent-strong hover:underline' : SECONDARY} to={reviewUrl}>
         Analizando…
       </Link>
     )
@@ -46,12 +45,12 @@ export function AnalyzeButton({ game, compact = false }: { game: GameSummary; co
         type="button"
         onClick={start}
         disabled={busy}
-        className={compact ? 'text-blue-700 hover:underline disabled:opacity-50' : PRIMARY}
+        className={compact ? 'text-accent-strong hover:underline disabled:opacity-50' : PRIMARY}
       >
         {busy ? 'Iniciando…' : 'Analizar partida'}
       </button>
       {error && (
-        <span role="alert" className="text-sm text-red-600">
+        <span role="alert" className="text-sm text-danger">
           {error}
         </span>
       )}

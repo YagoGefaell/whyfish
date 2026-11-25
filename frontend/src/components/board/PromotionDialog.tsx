@@ -1,11 +1,12 @@
 import type { Color } from '../../api/games'
 import type { PromotionPiece } from './moves'
+import { PieceImage } from './pieces'
 
-const PIECES: { piece: PromotionPiece; label: string; white: string; black: string }[] = [
-  { piece: 'q', label: 'Dama', white: '♕', black: '♛' },
-  { piece: 'r', label: 'Torre', white: '♖', black: '♜' },
-  { piece: 'b', label: 'Alfil', white: '♗', black: '♝' },
-  { piece: 'n', label: 'Caballo', white: '♘', black: '♞' },
+const PIECES: { piece: PromotionPiece; label: string; code: string }[] = [
+  { piece: 'q', label: 'Dama', code: 'Q' },
+  { piece: 'r', label: 'Torre', code: 'R' },
+  { piece: 'b', label: 'Alfil', code: 'B' },
+  { piece: 'n', label: 'Caballo', code: 'N' },
 ]
 
 interface Props {
@@ -19,12 +20,12 @@ export function PromotionDialog({ color, onSelect, onCancel }: Props) {
     <div
       role="dialog"
       aria-label="Elige la pieza de promoción"
-      className="absolute inset-0 z-10 flex items-center justify-center bg-black/40"
+      className="absolute inset-0 z-10 flex items-center justify-center bg-black/60"
     >
-      <div className="rounded-lg bg-white p-4 shadow-xl">
+      <div className="rounded-lg bg-panel p-4 shadow-xl border border-line">
         <p className="mb-3 text-center font-medium">Promocionar a…</p>
         <div className="flex gap-2">
-          {PIECES.map(({ piece, label, white, black }) => (
+          {PIECES.map(({ piece, label, code }) => (
             <button
               key={piece}
               type="button"
@@ -33,16 +34,19 @@ export function PromotionDialog({ color, onSelect, onCancel }: Props) {
               onClick={() => {
                 onSelect(piece)
               }}
-              className="h-16 w-16 rounded border border-gray-300 text-5xl leading-none hover:bg-amber-100"
+              className="h-16 w-16 rounded-lg border border-line bg-panel-2 flex items-center justify-center text-fg hover:bg-[#45423e]"
             >
-              {color === 'white' ? white : black}
+              <PieceImage
+                code={(color === 'white' ? 'w' : 'b') + code}
+                className="h-[85%] w-[85%]"
+              />
             </button>
           ))}
         </div>
         <button
           type="button"
           onClick={onCancel}
-          className="mt-3 w-full text-sm text-gray-600 hover:underline"
+          className="mt-3 w-full text-sm text-muted hover:underline"
         >
           Cancelar
         </button>

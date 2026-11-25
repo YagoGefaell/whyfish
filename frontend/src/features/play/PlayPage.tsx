@@ -7,14 +7,13 @@ import { AnalyzeButton } from './AnalyzeButton'
 import { MoveList } from './MoveList'
 import { usePlayGame, type PlayGame } from './usePlayGame'
 
-const BUTTON =
-  'rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+const BUTTON = 'btn'
 
 export function PlayPage() {
   const { id } = useParams()
   const gameId = Number(id)
   if (!Number.isInteger(gameId) || gameId <= 0) {
-    return <p className="text-red-600">Partida no válida.</p>
+    return <p className="text-danger">Partida no válida.</p>
   }
   return <PlayGameView key={gameId} gameId={gameId} />
 }
@@ -23,15 +22,15 @@ function PlayGameView({ gameId }: { gameId: number }) {
   const play = usePlayGame(gameId)
   const [orientation, setOrientation] = useState<Color | null>(null)
 
-  if (play.loadError) return <p className="text-red-600">{play.loadError}</p>
-  if (!play.game || !play.fen) return <p className="text-gray-500">Cargando partida…</p>
+  if (play.loadError) return <p className="text-danger">{play.loadError}</p>
+  if (!play.game || !play.fen) return <p className="text-muted">Cargando partida…</p>
 
   const game = play.game
   if (game.source === 'imported') {
     return (
       <p>
         Esta partida es importada.{' '}
-        <Link className="text-blue-700 underline" to={`/review/${String(game.id)}`}>
+        <Link className="text-accent-strong underline" to={`/review/${String(game.id)}`}>
           Ver su revisión
         </Link>
       </p>
@@ -42,25 +41,27 @@ function PlayGameView({ gameId }: { gameId: number }) {
   const last = game.moves.at(-1)
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
-      <Board
-        fen={play.fen}
-        orientation={orientation ?? game.player_color}
-        playerColor={game.player_color}
-        interactive={playerTurn && play.busy === null}
-        lastMove={last ? { from: last.uci.slice(0, 2), to: last.uci.slice(2, 4) } : null}
-        hintSquare={play.hintSquare}
-        onMove={play.move}
-      />
-      <aside className="flex min-w-64 flex-1 flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:flex-row lg:justify-center">
+      <div className="w-full min-w-0 lg:w-[min(calc(100vw-27rem),calc(100dvh-6.5rem))] lg:shrink-0">
+        <Board
+          fen={play.fen}
+          orientation={orientation ?? game.player_color}
+          playerColor={game.player_color}
+          interactive={playerTurn && play.busy === null}
+          lastMove={last ? { from: last.uci.slice(0, 2), to: last.uci.slice(2, 4) } : null}
+          hintSquare={play.hintSquare}
+          onMove={play.move}
+        />
+      </div>
+      <aside className="panel flex min-w-0 flex-col gap-4 self-start p-4 lg:w-[360px] lg:shrink-0">
         <header>
           <h2 className="text-lg font-semibold">
             Tú ({COLOR_LABEL[game.player_color]}) vs Stockfish · {game.bot_level_label}
           </h2>
           <StatusLine game={game} busy={play.busy} />
-          {play.notice && <p className="text-sm text-amber-700">{play.notice}</p>}
+          {play.notice && <p className="text-sm text-[#f7c631]">{play.notice}</p>}
           {play.actionError && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-danger">
               {play.actionError}
             </p>
           )}
@@ -85,15 +86,15 @@ function PlayGameView({ gameId }: { gameId: number }) {
 function StatusLine({ game, busy }: { game: GameState; busy: PlayGame['busy'] }) {
   if (game.status === 'finished' && game.result) {
     return (
-      <p className="font-medium text-blue-800">
+      <p className="font-medium text-accent-strong">
         {endText(game.result, game.termination, game.player_color)}
       </p>
     )
   }
   if (busy === 'move' || game.turn !== game.player_color) {
-    return <p className="text-gray-600">Stockfish está pensando…</p>
+    return <p className="text-muted">Stockfish está pensando…</p>
   }
-  return <p className="text-green-700">Te toca ({COLOR_LABEL[game.player_color]})</p>
+  return <p className="text-accent-strong">Te toca ({COLOR_LABEL[game.player_color]})</p>
 }
 
 function Controls({ play, game, onFlip }: { play: PlayGame; game: GameState; onFlip: () => void }) {
@@ -133,7 +134,7 @@ function Controls({ play, game, onFlip }: { play: PlayGame; game: GameState; onF
             ¿Abandonar?
             <button
               type="button"
-              className={`${BUTTON} border-red-400 text-red-700`}
+              className={`${BUTTON} border-danger text-danger`}
               disabled={!idle}
               onClick={() => {
                 setConfirmResign(false)
@@ -180,7 +181,7 @@ function Controls({ play, game, onFlip }: { play: PlayGame; game: GameState; onF
 function AssistsUsed({ game }: { game: GameState }) {
   if (!game.allow_undo && !game.allow_hint) return null
   return (
-    <p className="text-sm text-gray-500">
+    <p className="text-sm text-muted">
       Ayudas usadas:
       {game.allow_undo && ` deshacer ${String(game.undo_count)}`}
       {game.allow_undo && game.allow_hint && ' ·'}

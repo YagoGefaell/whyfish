@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 3 (interfaz de revisión) — **completada** (2026-11-25), pendiente de la prueba de
-aceptación del usuario (revisar una partida importada de principio a fin). Siguiente: Fase 4.
+Fase 3.5 (rediseño de la revisión) — **cerrada** (2026-11-25). Siguiente: Fase 4 (hechos y
+explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el plan.
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -110,9 +110,33 @@ aceptación del usuario (revisar una partida importada de principio a fin). Sigu
 - Bugs encontrados con el e2e: Playwright recarga el config en cada worker y borraba la base
   de prueba en uso (ahora la ruta se fija una vez y se pasa por entorno).
 
+### Fase 3.5 — Rediseño de la revisión
+- **Tema:** oscuro sobrio (tokens en `src/index.css`), Inter servida localmente, foco visible,
+  contraste del texto secundario ≥ 5,4:1. Botones `.btn`, `.btn-primary`, `.btn-icon`, `.panel`.
+- **Iconos:** `ClassBadge` (insignias SVG propias, color fijo por categoría), `lucide-react` para
+  la interfaz; sin emojis en toda la app.
+- **Piezas:** set cburnett de Wikimedia Commons (Colin M.L. Burnett), usado bajo **BSD** de su
+  licencia triple; aviso en `frontend/src/assets/pieces/cburnett/LICENSE.md`. Al 85 % de la
+  casilla; también en el tablero de juego y en la coronación.
+- **Revisión:** Resumen primero (posición final en el tablero, precisión, tabla de categorías
+  con la columna del usuario destacada, momentos clave, "Empezar revisión"); panel con la
+  gráfica arriba, pestañas, coach (insignia + "4… Bxf3 es una imprecisión", explicación
+  provisional, "La mejor era X" + flecha verde automáticas si la jugada no fue la mejor,
+  "Ver línea" numerada y clicable, "Detalles del motor" plegado que recuerda su estado), lista
+  en dos columnas con insignias solo en !!, !, ?!, ?, ?? y ✗, navegación con "Siguiente error"
+  (N) y ayuda de atajos. Tablero con franjas de jugador (usuario abajo, precisión a la
+  derecha), resaltado de origen/destino en el color de la clasificación e insignia en la
+  esquina, animación solo en pasos sueltos. Mientras se analiza, el tablero ya muestra la
+  partida y el panel la barra de progreso.
+- **Maquetación:** el tablero ocupa todo el alto disponible (616 px en 1366×768); tablero +
+  panel centrados; en móvil, tablero a todo el ancho y panel debajo.
+- **Cabecera de la app:** sin "Motor listo"; aviso discreto solo si el motor no responde.
+- **Tests:** frontend 45 (Vitest); e2e en 1920×1080, 1366×768 y Pixel 7 con capturas y
+  comprobaciones de tamaño y centrado.
+
 ## Pendiente / siguiente paso
-- Aceptación de la Fase 3 por el usuario: importar un PGN y revisarlo de principio a fin.
-- Fase 4: proponer plan y esperar OK. `MoveExplanation` es el hueco a rellenar.
+- Fase 4: proponer plan y esperar OK. `MoveExplanation` es el hueco a rellenar; la fila de
+  acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 6).
 
 ## Decisiones tomadas
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
@@ -173,6 +197,11 @@ aceptación del usuario (revisar una partida importada de principio a fin). Sigu
   en escritorio y móvil (Chromium, ~125 MB en `~/.cache/ms-playwright`). Pool de análisis
   compartido por análisis y evaluaciones; un análisis en curso hace esperar a las
   evaluaciones (cola de motores).
+- **Fase 3.5 (UX):** Resumen antes de la revisión; la mejor jugada se muestra sola cuando la
+  jugada no fue la mejor (excelente, buena, ?!, ?, ??, ✗) y nunca en ★, !, !!, libro; "Siguiente
+  error" solo recorre errores del usuario; gráfica siempre en el panel; ceros de la tabla en
+  gris tenue (~3:1, decisión consciente); jugadas sin clasificar resaltadas en blanco
+  translúcido.
 - **Tests de integración aparte:** marcador `integration`, `make test-integration`, tiempos de
   búsqueda reducidos; `make test` no los ejecuta.
 - **Un comando UCI a la vez por motor:** todo acceso al motor pasa por el lock de
@@ -192,6 +221,7 @@ aceptación del usuario (revisar una partida importada de principio a fin). Sigu
 - Elo de Principiante/Novato aproximado y sin calibrar.
 - Fixture frágil: Kasparov 24.Rxd4 queda en ~46,3 % con umbral 45; otra versión de Stockfish
   podría cambiarlo. Si un fixture cambia tras actualizar el motor, revisar con el usuario.
+- Insignias con "!!", "?!"… dibujadas como texto SVG: dependen de que cargue Inter (local).
 - Las evaluaciones de exploración esperan si hay un análisis en curso usando todos los motores.
 - Los tests rápidos del backend tardan ~13 s (cada app de prueba ejecuta las migraciones).
 - Cabeceras PGN en las partidas jugadas: el `Event` es "whyfish" y la `Date` la de creación.

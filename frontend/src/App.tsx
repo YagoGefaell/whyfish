@@ -1,3 +1,5 @@
+import { FileUp, History, Swords } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { EngineStatus } from './components/EngineStatus'
 import { HistoryPage } from './features/history/HistoryPage'
@@ -6,30 +8,46 @@ import { NewGamePage } from './features/play/NewGamePage'
 import { PlayPage } from './features/play/PlayPage'
 import { ReviewPage } from './features/review/ReviewPage'
 
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  isActive ? 'font-semibold text-blue-800' : 'text-gray-600 hover:text-gray-900'
+function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={to === '/'}
+      className={({ isActive }) =>
+        `inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+          isActive ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel hover:text-fg'
+        }`
+      }
+    >
+      {icon}
+      {children}
+    </NavLink>
+  )
+}
 
 export default function App() {
   return (
-    <div className="mx-auto max-w-5xl p-4 font-sans sm:p-8">
-      <header className="mb-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-        <h1 className="text-2xl font-bold">whyfish</h1>
-        <nav className="flex gap-4">
-          <NavLink to="/" end className={navClass}>
-            Nueva partida
-          </NavLink>
-          <NavLink to="/import" className={navClass}>
+    <div className="mx-auto flex min-h-dvh max-w-[1400px] flex-col px-4 pb-4 sm:px-6">
+      <header className="flex h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-1">
+        <h1 className="text-lg font-bold tracking-tight">
+          why<span className="text-accent">fish</span>
+        </h1>
+        <nav className="flex gap-1">
+          <NavItem to="/" icon={<Swords size={16} />}>
+            Jugar
+          </NavItem>
+          <NavItem to="/import" icon={<FileUp size={16} />}>
             Importar
-          </NavLink>
-          <NavLink to="/games" className={navClass}>
+          </NavItem>
+          <NavItem to="/games" icon={<History size={16} />}>
             Historial
-          </NavLink>
+          </NavItem>
         </nav>
         <span className="ml-auto text-sm">
           <EngineStatus />
         </span>
       </header>
-      <main>
+      <main className="flex-1">
         <Routes>
           <Route path="/" element={<NewGamePage />} />
           <Route path="/play/:id" element={<PlayPage />} />

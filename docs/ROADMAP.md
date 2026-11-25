@@ -29,6 +29,18 @@ Cada fase termina con algo usable y comprobable. No empezar una fase sin cerrar 
 - Importar PGN/FEN.
 - **Aceptación:** reviso una partida importada de principio a fin sin tocar la API a mano.
 
+## Fase 3.5 — Rediseño de la revisión
+- Tema oscuro sobrio (Inter local), insignias de clasificación en SVG propio, iconos con
+  lucide-react, piezas cburnett (BSD), cero emojis; coherente en todas las pantallas.
+- Revisión estilo "coach": Resumen primero (precisión, categorías, momentos clave,
+  "Empezar revisión"), panel con frase corta + explicación, mejor jugada automática cuando la
+  jugada no fue la mejor ("Ver línea" numerada), "Siguiente error" (N), detalles del motor
+  plegados; gráfica en el panel; franjas de jugador con precisión; tablero que ocupa todo el
+  alto; diseño móvil.
+- **Aceptación:** capturas de Playwright (1920×1080, 1366×768, móvil) revisadas por el
+  usuario; `make test-e2e` comprueba tablero ≥ 600 px en 1366×768, todo dentro de la ventana
+  y el conjunto centrado.
+
 ## Fase 4 — Hechos y explicaciones por plantilla
 - `analysis/facts.py` con todos los detectores de SPEC §4 y tests por detector.
 - Plantillas de nivel 1 y 2 en español, con jugadas marcadas `[[SAN]]`.

@@ -1,9 +1,18 @@
-import { useMemo, useState, type CSSProperties } from 'react'
-import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs } from 'react-chessboard'
 import { Chess } from 'chess.js'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  Chessboard,
+  defaultArrowOptions,
+  type PieceDropHandlerArgs,
+  type SquareHandlerArgs,
+} from 'react-chessboard'
+import type { Classification } from '../../api/analysis'
 import type { Color } from '../../api/games'
+import { ClassBadge } from '../../components/ClassBadge'
+import { BOARD_COLORS } from '../../components/board/theme'
 import { PromotionDialog } from '../../components/board/PromotionDialog'
 import { resolveDrop, type PromotionPiece } from '../../components/board/moves'
+import { CLASSIFICATIONS } from './classification'
 
 export interface BoardArrow {
   from: string
@@ -11,52 +20,64 @@ export interface BoardArrow {
   color: string
 }
 
-export interface SquareBadge {
-  square: string
-  mark: string
-  color: string
-  label: string
+/** The move shown on the board: neutral highlight on its origin, class colour on its target. */
+export interface ShownMove {
+  from: string
+  to: string
+  classification: Classification | null // null = no classification (exploring, not analysed)
 }
 
 interface Props {
   fen: string
   orientation: Color
   arrows: BoardArrow[]
-  highlight: { from: string; to: string; color: string } | null
-  badge: SquareBadge | null
+  shownMove: ShownMove | null
+  /** Slide pieces (single steps) or jump (long jumps). */
+  animate: boolean
   /** A legal move made on the board (any side to move): enters/extends exploration. */
   onMove: (uci: string) => void
 }
 
-export function ReviewBoard({ fen, orientation, arrows, highlight, badge, onMove }: Props) {
+/** Best-move arrow: intense green, thicker and more opaque than the default, visible over pieces. */
+const ARROW_OPTIONS = { ...defaultArrowOptions, opacity: 0.8, arrowWidthDenominator: 4 }
+
+/** For moves without a classification (exploring, not analysed yet). */
+const NEUTRAL_FROM = 'rgba(255, 255, 255, 0.22)'
+const NEUTRAL_TO = 'rgba(255, 255, 255, 0.36)'
+/** Hex alpha suffixes: origin ~30 %, target ~55 %. */
+const FROM_ALPHA = '4d'
+const TO_ALPHA = '8c'
+
+export function ReviewBoard({ fen, orientation, arrows, shownMove, animate, onMove }: Props) {
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null)
   const turn: Color = new Chess(fen).turn() === 'w' ? 'white' : 'black'
 
   const squareStyles = useMemo(() => {
     const styles: Record<string, CSSProperties> = {}
-    if (highlight) {
-      const bg = { backgroundColor: `${highlight.color}66` }
-      styles[highlight.from] = bg
-      styles[highlight.to] = bg
+    if (shownMove) {
+      const color = shownMove.classification
+        ? CLASSIFICATIONS[shownMove.classification].color
+        : null
+      styles[shownMove.from] = { backgroundColor: color ? color + FROM_ALPHA : NEUTRAL_FROM }
+      styles[shownMove.to] = { backgroundColor: color ? color + TO_ALPHA : NEUTRAL_TO }
     }
     return styles
-  }, [highlight])
+  }, [shownMove])
 
-  const squareRenderer = ({
-    square,
-    children,
-  }: SquareHandlerArgs & { children?: React.ReactNode }) => (
+  const badgeSquare = shownMove?.classification ? shownMove.to : null
+  const squareRenderer = ({ square, children }: SquareHandlerArgs & { children?: ReactNode }) => (
     <div style={{ width: '100%', height: '100%', position: 'relative', ...squareStyles[square] }}>
       {children}
-      {badge?.square === square && (
+      {badgeSquare === square && shownMove?.classification && (
         <span
           data-testid="move-badge"
-          aria-label={badge.label}
-          title={badge.label}
-          className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-[38%] min-h-4 w-[38%] min-w-4 items-center justify-center rounded-full border-2 border-white text-[min(1.6vw,13px)] font-bold leading-none text-white shadow"
-          style={{ backgroundColor: badge.color }}
+          className="pointer-events-none absolute -top-[14%] -right-[14%] z-10 h-[46%] w-[46%] drop-shadow-md"
         >
-          {badge.mark}
+          <ClassBadge
+            classification={shownMove.classification}
+            size={100}
+            className="h-full w-full"
+          />
         </span>
       )}
     </div>
@@ -82,7 +103,7 @@ export function ReviewBoard({ fen, orientation, arrows, highlight, badge, onMove
   }
 
   return (
-    <div className="relative w-full">
+    <div data-testid="review-board" className="relative w-full overflow-visible">
       <Chessboard
         options={{
           id: 'review-board',
@@ -90,8 +111,12 @@ export function ReviewBoard({ fen, orientation, arrows, highlight, badge, onMove
           boardOrientation: orientation,
           arrows: arrows.map((a) => ({ startSquare: a.from, endSquare: a.to, color: a.color })),
           allowDrawingArrows: false,
+          arrowOptions: ARROW_OPTIONS,
+          showAnimations: animate,
+          animationDurationInMs: 200,
           onPieceDrop,
           squareRenderer,
+          ...BOARD_COLORS,
         }}
       />
       {promotion && (
