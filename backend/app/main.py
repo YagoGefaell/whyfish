@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import games, health
+from app.analysis.runner import AnalysisService
+from app.api import analysis, games, health
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
 from app.engine.state import EngineState
@@ -22,6 +23,7 @@ EngineFactory = Callable[[Settings], Awaitable[Engine]]
 def create_app(
     settings: Settings | None = None,
     engine_factory: EngineFactory = StockfishEngine.start,
+    analysis_engine_factory: EngineFactory = StockfishEngine.start_for_analysis,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
 
@@ -41,9 +43,19 @@ def create_app(
             logger.error("Engine unavailable: %s", exc)
             engine_state.error = str(exc)
         app.state.engine_state = engine_state
+
+        def engine_name() -> str | None:
+            return engine_state.engine.name if engine_state.engine else None
+
+        analysis_service = AnalysisService(
+            db_engine, resolved_settings, analysis_engine_factory, engine_name
+        )
+        analysis_service.mark_interrupted()
+        app.state.analysis_service = analysis_service
         try:
             yield
         finally:
+            await analysis_service.shutdown()
             if engine_state.engine is not None:
                 await engine_state.engine.close()
             db_engine.dispose()
@@ -51,6 +63,7 @@ def create_app(
     app = FastAPI(title="whyfish", lifespan=lifespan)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(games.router, prefix=API_PREFIX)
+    app.include_router(analysis.router, prefix=API_PREFIX)
     return app
 
 

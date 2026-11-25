@@ -34,5 +34,10 @@ Abre http://localhost:5173, elige color y nivel y juega. Las partidas se guardan
 Otros comandos (`make help` para la lista):
 - `make test` — tests rápidos (motor falso + Vitest).
 - `make test-integration` — tests contra el Stockfish real (partida completa contra cada nivel).
+- `make analyze PGN=partida.pgn` — analiza un PGN con Stockfish e imprime la clasificación de
+  cada jugada (opciones: `ARGS="--time 1 --perspective black"`).
 - `make lint`, `make fmt`.
+
+La revisión de una partida terminada se obtiene por API: `POST /api/games/{id}/analysis`
+(progreso en `GET /api/games/{id}/analysis/stream`, SSE) y `GET /api/games/{id}/review`.
 Todas las rutas del backend van bajo `/api`. `GET /api/health` devuelve el estado y la versión de Stockfish.

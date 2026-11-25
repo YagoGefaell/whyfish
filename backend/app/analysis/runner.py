@@ -1,0 +1,265 @@
+"""Background analysis of finished games: positions -> engine pool -> cache.
+
+`evaluate_positions` is the DB-free core (also used by the CLI). `AnalysisService` owns the
+jobs: one runs at a time, progress is published for the SSE endpoint, results go to the
+`PositionAnalysis` cache. Reviews are computed on demand from that cache.
+"""
+
+import asyncio
+import contextlib
+import json
+import logging
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+
+import chess.engine
+from sqlalchemy import Engine as DbEngine
+from sqlmodel import Session, col, select
+
+from app.analysis.positions import GamePosition, game_positions
+from app.analysis.types import EngineLine, PositionEval
+from app.config import Settings
+from app.engine.pool import EngineFactory, EnginePool, open_pool
+from app.models.analysis import AnalysisJob, AnalysisStatus, PositionAnalysis
+from app.models.game import utcnow
+from app.play.service import GameRepository, GameRuleError
+
+logger = logging.getLogger(__name__)
+
+
+def settings_key(engine_name: str, settings: Settings) -> str:
+    depth = settings.analysis_depth if settings.analysis_depth is not None else "-"
+    return f"{engine_name}|t={settings.analysis_time_s}|d={depth}|mpv={settings.analysis_multipv}"
+
+
+def search_limit(settings: Settings) -> chess.engine.Limit:
+    return chess.engine.Limit(time=settings.analysis_time_s, depth=settings.analysis_depth)
+
+
+def lines_to_json(lines: Sequence[EngineLine]) -> str:
+    return json.dumps([{"moves": list(ln.moves), "cp": ln.cp, "mate": ln.mate} for ln in lines])
+
+
+def lines_from_json(text: str) -> tuple[EngineLine, ...]:
+    return tuple(
+        EngineLine(moves=tuple(d["moves"]), cp=d["cp"], mate=d["mate"]) for d in json.loads(text)
+    )
+
+
+async def evaluate_positions(
+    positions: Iterable[GamePosition],
+    pool: EnginePool,
+    limit: chess.engine.Limit,
+    multipv: int,
+    on_result: Callable[[GamePosition, tuple[EngineLine, ...]], Awaitable[None] | None],
+) -> None:
+    """Analyse `positions` in parallel with the pool; call `on_result` as each one finishes."""
+
+    async def work(position: GamePosition) -> None:
+        async with pool.acquire() as engine:
+            lines = await engine.analyse(position.board, limit, multipv)
+        maybe = on_result(position, lines)
+        if maybe is not None:
+            await maybe
+
+    await asyncio.gather(*(work(p) for p in positions))
+
+
+class AnalysisNotReadyError(Exception):
+    """The game has no finished analysis (user-facing, Spanish)."""
+
+
+class AnalysisEngineUnavailableError(Exception):
+    """No engine to analyse with (user-facing, Spanish)."""
+
+
+class AnalysisService:
+    def __init__(
+        self,
+        db_engine: DbEngine,
+        settings: Settings,
+        engine_factory: EngineFactory,
+        engine_name: Callable[[], str | None],
+    ) -> None:
+        self._db = db_engine
+        self._settings = settings
+        self._factory = engine_factory
+        self._engine_name = engine_name
+        self._tasks: dict[int, asyncio.Task[None]] = {}
+        self._one_at_a_time = asyncio.Lock()
+        self._changed = asyncio.Condition()
+
+    # --- Lifecycle --------------------------------------------------------
+
+    def mark_interrupted(self) -> None:
+        """At startup: jobs left pending/running by a previous process will never finish."""
+        with Session(self._db) as session:
+            stale = session.exec(
+                select(AnalysisJob).where(
+                    col(AnalysisJob.status).in_([AnalysisStatus.PENDING, AnalysisStatus.RUNNING])
+                )
+            ).all()
+            for job in stale:
+                job.status = AnalysisStatus.FAILED
+                job.error = "Análisis interrumpido por un reinicio del servidor."
+                session.add(job)
+            session.commit()
+
+    async def shutdown(self) -> None:
+        for task in self._tasks.values():
+            task.cancel()
+        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+
+    # --- Queries ----------------------------------------------------------
+
+    def job(self, game_id: int) -> AnalysisJob | None:
+        with Session(self._db) as session:
+            return session.exec(select(AnalysisJob).where(AnalysisJob.game_id == game_id)).first()
+
+    def evaluations(self, game_id: int) -> tuple[AnalysisJob, list[PositionEval]]:
+        """Evaluation of every position of an analysed game, from the cache."""
+        job = self.job(game_id)
+        if job is None or job.status is not AnalysisStatus.DONE:
+            raise AnalysisNotReadyError("La partida no está analizada todavía.")
+        with Session(self._db) as session:
+            loaded = GameRepository(session).load(game_id)
+            positions = game_positions(loaded.game.initial_fen, [m.uci for m in loaded.moves])
+            rows = session.exec(
+                select(PositionAnalysis).where(
+                    PositionAnalysis.settings_key == job.settings_key,
+                    col(PositionAnalysis.key).in_([p.key for p in positions]),
+                )
+            ).all()
+        cache = {r.key: lines_from_json(r.lines_json) for r in rows}
+        evals: list[PositionEval] = []
+        for p in positions:
+            if p.terminal is not None:
+                evals.append(p.terminal)
+            elif p.key in cache:
+                evals.append(PositionEval(lines=cache[p.key]))
+            else:
+                raise AnalysisNotReadyError("Faltan posiciones en la caché; vuelve a analizar.")
+        return job, evals
+
+    async def wait_for_change(self, max_wait_s: float) -> None:
+        """Return when any job's progress changes, or after `max_wait_s`."""
+        async with self._changed:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._changed.wait(), max_wait_s)
+
+    # --- Commands ---------------------------------------------------------
+
+    def start(self, game_id: int) -> AnalysisJob:
+        """Queue an analysis unless one is running or already done with these settings."""
+        with Session(self._db) as session:
+            loaded = GameRepository(session).load(game_id)  # raises GameNotFoundError
+            if not loaded.game.is_over:
+                raise GameRuleError("Solo se pueden analizar partidas terminadas.")
+        name = self._engine_name()
+        if name is None:
+            raise AnalysisEngineUnavailableError("El motor no está disponible.")
+        key = settings_key(name, self._settings)
+
+        with Session(self._db) as session:
+            job = session.exec(select(AnalysisJob).where(AnalysisJob.game_id == game_id)).first()
+            if job is not None:
+                busy = job.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING)
+                done = job.status is AnalysisStatus.DONE and job.settings_key == key
+                if busy or done:
+                    return job
+            else:
+                job = AnalysisJob(game_id=game_id, settings_key=key, status=AnalysisStatus.PENDING)
+            job.settings_key = key
+            job.status = AnalysisStatus.PENDING
+            job.done = job.total = 0
+            job.error = None
+            job.finished_at = None
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+
+        self._tasks[game_id] = asyncio.create_task(self._run(game_id, key))
+        return job
+
+    async def _run(self, game_id: int, key: str) -> None:
+        try:
+            async with self._one_at_a_time:
+                await self._analyse(game_id, key)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("Analysis of game %s failed", game_id)
+            await self._update(game_id, status=AnalysisStatus.FAILED, error=f"Error: {exc}")
+        finally:
+            self._tasks.pop(game_id, None)
+
+    async def _analyse(self, game_id: int, key: str) -> None:
+        with Session(self._db) as session:
+            loaded = GameRepository(session).load(game_id)
+            positions = game_positions(loaded.game.initial_fen, [m.uci for m in loaded.moves])
+            todo = [p for p in positions if p.terminal is None]
+            cached = set(
+                session.exec(
+                    select(PositionAnalysis.key).where(
+                        PositionAnalysis.settings_key == key,
+                        col(PositionAnalysis.key).in_([p.key for p in todo]),
+                    )
+                ).all()
+            )
+        missing = list({p.key: p for p in todo if p.key not in cached}.values())
+        done = len(todo) - len(missing)
+        await self._update(game_id, status=AnalysisStatus.RUNNING, done=done, total=len(todo))
+
+        if missing:
+            size = max(1, min(self._settings.engine_pool_size, len(missing)))
+
+            async def save(position: GamePosition, lines: tuple[EngineLine, ...]) -> None:
+                nonlocal done
+                with Session(self._db) as session:
+                    session.add(
+                        PositionAnalysis(
+                            key=position.key,
+                            settings_key=key,
+                            fen=position.board.fen(),
+                            lines_json=lines_to_json(lines),
+                        )
+                    )
+                    session.commit()
+                done += 1
+                await self._update(game_id, done=done)
+
+            async with open_pool(self._factory, self._settings, size) as pool:
+                await evaluate_positions(
+                    missing,
+                    pool,
+                    search_limit(self._settings),
+                    self._settings.analysis_multipv,
+                    save,
+                )
+        await self._update(game_id, status=AnalysisStatus.DONE, finished=True)
+
+    async def _update(
+        self,
+        game_id: int,
+        *,
+        status: AnalysisStatus | None = None,
+        done: int | None = None,
+        total: int | None = None,
+        error: str | None = None,
+        finished: bool = False,
+    ) -> None:
+        with Session(self._db) as session:
+            job = session.exec(select(AnalysisJob).where(AnalysisJob.game_id == game_id)).one()
+            if status is not None:
+                job.status = status
+            if done is not None:
+                job.done = done
+            if total is not None:
+                job.total = total
+            if error is not None:
+                job.error = error
+            if finished or status is AnalysisStatus.FAILED:
+                job.finished_at = utcnow()
+            session.add(job)
+            session.commit()
+        async with self._changed:
+            self._changed.notify_all()

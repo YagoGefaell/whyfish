@@ -1,0 +1,215 @@
+from collections.abc import AsyncIterable
+from typing import Annotated, Literal
+
+import chess
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.sse import EventSourceResponse, ServerSentEvent
+from pydantic import BaseModel
+
+from app.analysis.book import default_book
+from app.analysis.review import GameReview, MoveReview, PlayerSummary, build_review
+from app.analysis.runner import (
+    AnalysisEngineUnavailableError,
+    AnalysisNotReadyError,
+    AnalysisService,
+)
+from app.analysis.types import SYMBOLS, Classification
+from app.api.deps import get_game_repository
+from app.models.analysis import AnalysisJob, AnalysisStatus
+from app.play.rules import PlayerColor
+from app.play.service import GameNotFoundError, GameRepository, GameRuleError
+
+router = APIRouter()
+
+# Seconds between SSE keep-alive comments while nothing changes.
+SSE_KEEPALIVE_S = 15.0
+
+
+def get_analysis_service(request: Request) -> AnalysisService:
+    service: AnalysisService = request.app.state.analysis_service
+    return service
+
+
+Analysis = Annotated[AnalysisService, Depends(get_analysis_service)]
+Repo = Annotated[GameRepository, Depends(get_game_repository)]
+
+
+class AnalysisJobRead(BaseModel):
+    game_id: int
+    status: AnalysisStatus
+    done: int
+    total: int
+    error: str | None
+
+    @classmethod
+    def from_job(cls, job: AnalysisJob) -> "AnalysisJobRead":
+        return cls(
+            game_id=job.game_id, status=job.status, done=job.done, total=job.total, error=job.error
+        )
+
+
+def _color(color: chess.Color) -> PlayerColor:
+    return PlayerColor.WHITE if color == chess.WHITE else PlayerColor.BLACK
+
+
+class MoveReviewRead(BaseModel):
+    ply: int
+    color: PlayerColor
+    uci: str
+    san: str
+    classification: Classification
+    symbol: str
+    win_before: float
+    win_after: float
+    delta: float
+    accuracy: float
+    best_uci: str | None
+    best_san: str | None
+    best_line: list[str]
+    played_line: list[str]
+
+    @classmethod
+    def from_review(cls, m: MoveReview) -> "MoveReviewRead":
+        return cls(
+            ply=m.ply,
+            color=_color(m.color),
+            uci=m.uci,
+            san=m.san,
+            classification=m.classification,
+            symbol=SYMBOLS[m.classification],
+            win_before=round(m.win_before, 1),
+            win_after=round(m.win_after, 1),
+            delta=round(m.delta, 1),
+            accuracy=round(m.accuracy, 1),
+            best_uci=m.best_uci,
+            best_san=m.best_san,
+            best_line=list(m.best_line),
+            played_line=list(m.played_line),
+        )
+
+
+class PlayerSummaryRead(BaseModel):
+    accuracy: float | None
+    counts: dict[Classification, int]
+
+    @classmethod
+    def from_summary(cls, s: PlayerSummary) -> "PlayerSummaryRead":
+        accuracy = round(s.accuracy, 1) if s.accuracy is not None else None
+        return cls(accuracy=accuracy, counts=s.counts)
+
+
+class EvalRead(BaseModel):
+    """Evaluation of a position from white's point of view."""
+
+    win: float
+    cp: int | None
+    mate: int | None
+
+
+class OpeningRead(BaseModel):
+    eco: str
+    name: str
+
+
+class ReviewRead(BaseModel):
+    game_id: int
+    perspective: PlayerColor
+    opening: OpeningRead | None
+    white: PlayerSummaryRead
+    black: PlayerSummaryRead
+    key_moments: list[int]
+    moves: list[MoveReviewRead]
+    evals: list[EvalRead]  # one per position: start + after each move
+
+    @classmethod
+    def from_review(cls, game_id: int, perspective: PlayerColor, r: GameReview) -> "ReviewRead":
+        return cls(
+            game_id=game_id,
+            perspective=perspective,
+            opening=OpeningRead(eco=r.opening.eco, name=r.opening.name) if r.opening else None,
+            white=PlayerSummaryRead.from_summary(r.white),
+            black=PlayerSummaryRead.from_summary(r.black),
+            key_moments=r.key_moments,
+            moves=[MoveReviewRead.from_review(m) for m in r.moves],
+            evals=[EvalRead(win=round(e.win, 1), cp=e.cp, mate=e.mate) for e in r.evals],
+        )
+
+
+def _not_found() -> HTTPException:
+    return HTTPException(status.HTTP_404_NOT_FOUND, "Partida no encontrada.")
+
+
+@router.post("/games/{game_id}/analysis", status_code=status.HTTP_202_ACCEPTED)
+async def start_analysis(game_id: int, service: Analysis, response: Response) -> AnalysisJobRead:
+    # async: the job is scheduled with asyncio.create_task on the running event loop.
+    try:
+        job = service.start(game_id)
+    except GameNotFoundError as exc:
+        raise _not_found() from exc
+    except GameRuleError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except AnalysisEngineUnavailableError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    if job.status is AnalysisStatus.DONE:
+        response.status_code = status.HTTP_200_OK
+    return AnalysisJobRead.from_job(job)
+
+
+@router.get("/games/{game_id}/analysis")
+def get_analysis(game_id: int, service: Analysis) -> AnalysisJobRead:
+    job = service.job(game_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La partida no se ha analizado.")
+    return AnalysisJobRead.from_job(job)
+
+
+def require_job(game_id: int, service: Analysis) -> int:
+    """404 before the stream starts (an exception inside the generator would be too late)."""
+    if service.job(game_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La partida no se ha analizado.")
+    return game_id
+
+
+@router.get("/games/{game_id}/analysis/stream", response_class=EventSourceResponse)
+async def stream_analysis(
+    game_id: Annotated[int, Depends(require_job)], service: Analysis
+) -> AsyncIterable[ServerSentEvent]:
+    """Progress events until the analysis finishes: `progress`, then `done` or `failed`."""
+    last: tuple[str, int, int] | None = None
+    while True:
+        job = service.job(game_id)
+        assert job is not None
+        current = (job.status.value, job.done, job.total)
+        if current == last:
+            yield ServerSentEvent(comment="keep-alive")
+        else:
+            last = current
+            event: Literal["progress", "done", "failed"] = "progress"
+            if job.status is AnalysisStatus.DONE:
+                event = "done"
+            elif job.status is AnalysisStatus.FAILED:
+                event = "failed"
+            yield ServerSentEvent(data=AnalysisJobRead.from_job(job), event=event)
+            if event != "progress":
+                return
+        await service.wait_for_change(SSE_KEEPALIVE_S)
+
+
+@router.get("/games/{game_id}/review")
+def get_review(game_id: int, service: Analysis, repo: Repo) -> ReviewRead:
+    try:
+        loaded = repo.load(game_id)
+        _, evals = service.evaluations(game_id)
+    except GameNotFoundError as exc:
+        raise _not_found() from exc
+    except AnalysisNotReadyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    perspective = loaded.game.player_color
+    review = build_review(
+        loaded.game.initial_fen,
+        [m.uci for m in loaded.moves],
+        evals,
+        perspective=perspective.chess_color,
+        book=default_book(),
+    )
+    return ReviewRead.from_review(game_id, perspective, review)

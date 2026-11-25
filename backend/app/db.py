@@ -4,7 +4,8 @@ from sqlalchemy import Engine as DbEngine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, create_engine
 
-import app.models.game  # noqa: F401  (registers tables)
+import app.models.analysis
+import app.models.game  # noqa: F401
 
 
 def make_db_engine(url: str) -> DbEngine:

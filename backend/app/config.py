@@ -4,14 +4,21 @@ Every tunable constant (thresholds, depths, timeouts) lives here. Values in `Set
 overridden through environment variables or the repo-root `.env` file.
 """
 
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _default_pool_size() -> int:
+    """CPU count - 1, between 1 and 4 (a Raspberry Pi 4 has 4 cores)."""
+    return max(1, min(4, (os.cpu_count() or 2) - 1))
 
 
 class Settings(BaseSettings):
@@ -46,6 +53,16 @@ class Settings(BaseSettings):
     draw_min_moves: int = 20
     # Name of the human player in PGN headers.
     player_name: str = "Jugador"
+
+    # --- Analysis ---------------------------------------------------------
+    # Engines analysing positions in parallel (separate from the play engine).
+    engine_pool_size: int = Field(default_factory=_default_pool_size)
+    # Per-position search: time limit, optional depth limit (whichever comes first).
+    analysis_time_s: float = 0.5
+    analysis_depth: int | None = None
+    analysis_multipv: int = 3
+    analysis_threads: int = 1
+    analysis_hash_mb: int = 32
 
     # --- Storage ----------------------------------------------------------
     database_url: str = f"sqlite:///{REPO_ROOT / 'data' / 'whyfish.db'}"
@@ -89,3 +106,39 @@ LEVEL_PRESETS: dict[BotLevel, LevelPreset] = {
     BotLevel.STRONG: LevelPreset("Fuerte ~2000", uci_elo=2000),
     BotLevel.MAX: LevelPreset("Máximo"),
 }
+
+
+# --- Move classification (SPEC §3) -------------------------------------------
+# All values are win-percentage points (0-100) from the mover's point of view.
+
+
+@dataclass(frozen=True)
+class ClassificationThresholds:
+    # Δ upper bounds (exclusive) for the plain categories; Δ >= mistake -> blunder.
+    excellent: float = 2.0
+    good: float = 5.0
+    inaccuracy: float = 10.0
+    mistake: float = 20.0
+    # "Best" also covers moves whose Δ is at most this (another move as good as the top one).
+    best_max_delta: float = 0.5
+    # Great move (!): the second MultiPV option is at least this much worse...
+    great_min_gap: float = 10.0
+    # ...or falls into another outcome category (winning > winning_above, losing < losing_below).
+    winning_above: float = 75.0
+    losing_below: float = 25.0
+    # Brilliant (!!).
+    brilliant_max_delta: float = 2.0
+    brilliant_max_win_before: float = 90.0  # exclusive: not already totally winning
+    brilliant_min_win_after: float = 50.0
+    sacrifice_min_material: int = 2  # points (P=1, N=B=3, R=5, Q=9)
+    sacrifice_horizon_plies: int = 6
+    # Missed opportunity: after an opponent's ? / ??, Δ >= this and the best move reached
+    # at least `missed_decisive_win`.
+    missed_min_delta: float = 10.0
+    missed_decisive_win: float = 80.0
+    # Key moments (SPEC §3.4).
+    key_moments_max: int = 5
+    key_moment_min_delta: float = 5.0
+
+
+THRESHOLDS = ClassificationThresholds()

@@ -1,6 +1,6 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration analyze \
         lint lint-backend lint-frontend fmt
 
 help:
@@ -8,6 +8,7 @@ help:
 	@echo "make dev       Run backend (:$(BACKEND_PORT)) and frontend (Vite) together"
 	@echo "make test      Fast tests: pytest (fake engine) + Vitest"
 	@echo "make test-integration  Tests against the real Stockfish (reduced search times)"
+	@echo "make analyze PGN=file.pgn  Analyse a PGN with Stockfish and print the review"
 	@echo "make lint      ruff + mypy --strict, ESLint + Prettier + tsc"
 	@echo "make fmt       Auto-format backend and frontend"
 
@@ -34,6 +35,10 @@ test-integration:
 
 test-frontend:
 	cd frontend && pnpm test
+
+analyze:
+	@test -n "$(PGN)" || (echo "Usage: make analyze PGN=path/to/game.pgn" && exit 1)
+	cd backend && uv run python -m app.analysis.cli "$(abspath $(PGN))" $(ARGS)
 
 lint: lint-backend lint-frontend
 

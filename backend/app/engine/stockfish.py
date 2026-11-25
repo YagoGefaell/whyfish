@@ -9,6 +9,7 @@ from typing import Protocol
 import chess
 import chess.engine
 
+from app.analysis.types import EngineLine
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,14 @@ class Engine(Protocol):
     ) -> chess.engine.PovScore:
         """Full-strength evaluation of `board`."""
 
+    async def analyse(
+        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+    ) -> tuple[EngineLine, ...]:
+        """Top `multipv` lines (best first), scores from the side to move's point of view.
+
+        `board`'s move history is sent too, so the engine can see repetitions.
+        """
+
     async def close(self) -> None: ...
 
 
@@ -66,6 +75,16 @@ class StockfishEngine:
 
     @classmethod
     async def start(cls, settings: Settings) -> "StockfishEngine":
+        """Engine for playing (and hints / draw offers)."""
+        return await cls._start(settings, settings.engine_threads, settings.engine_hash_mb)
+
+    @classmethod
+    async def start_for_analysis(cls, settings: Settings) -> "StockfishEngine":
+        """One engine of the analysis pool."""
+        return await cls._start(settings, settings.analysis_threads, settings.analysis_hash_mb)
+
+    @classmethod
+    async def _start(cls, settings: Settings, threads: int, hash_mb: int) -> "StockfishEngine":
         path = settings.stockfish_path
         if path is None:
             raise EngineUnavailableError("STOCKFISH_PATH is not configured")
@@ -81,9 +100,7 @@ class StockfishEngine:
 
         engine = cls(transport, protocol, settings)
         try:
-            await protocol.configure(
-                {"Threads": settings.engine_threads, "Hash": settings.engine_hash_mb}
-            )
+            await protocol.configure({"Threads": threads, "Hash": hash_mb})
         except chess.engine.EngineError as exc:
             await engine.close()
             raise EngineUnavailableError(f"Could not configure Stockfish: {exc!r}") from exc
@@ -139,6 +156,29 @@ class StockfishEngine:
         if score is None:
             raise EngineUnavailableError("Engine returned no score")
         return score
+
+    async def analyse(
+        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+    ) -> tuple[EngineLine, ...]:
+        try:
+            async with self._lock:
+                infos = await self._protocol.analyse(board, limit, multipv=multipv)
+        except chess.engine.EngineError as exc:
+            raise EngineUnavailableError(f"Engine failed while analysing: {exc!r}") from exc
+        lines: list[EngineLine] = []
+        for info in infos:
+            pv, score = info.get("pv"), info.get("score")
+            if not pv or score is None:
+                continue
+            relative = score.pov(board.turn)
+            lines.append(
+                EngineLine(
+                    moves=tuple(m.uci() for m in pv), cp=relative.score(), mate=relative.mate()
+                )
+            )
+        if not lines:
+            raise EngineUnavailableError("Engine returned no lines")
+        return tuple(lines)
 
     async def close(self) -> None:
         # The process may already be dead, e.g. Ctrl-C in `make dev` sends SIGINT to the whole

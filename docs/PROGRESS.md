@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 1 — **cerrada** (2026-11-25). Siguiente: Fase 2 (motor de análisis y clasificación), que
-se empieza en una conversación nueva: leer SPEC + ROADMAP + este archivo y proponer el plan.
+Fase 2 (motor de análisis y clasificación) — **implementada, pendiente de revisión** (2026-11-25):
+falta que el usuario revise la lista de fixtures reales y decida 3 reglas en disputa (abajo).
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -64,8 +64,38 @@ se empieza en una conversación nueva: leer SPEC + ROADMAP + este archivo y prop
     numera según la FEN (turno y número de jugada).
   - Tests: backend 94 unitarios + 9 integración; frontend 27.
 
+### Fase 2 — Motor de análisis y clasificación
+- **Lógica pura** (`app/analysis/`): `winprob.py` (win% y precisión Lichess, fórmulas
+  documentadas), `material.py` (material, SEE con piezas clavadas/rayos X, piezas recién en
+  prise), `book.py` (libro lichess-org/chess-openings, CC0, copiado en `app/analysis/data/`),
+  `classify.py` (SPEC §3 en el orden acordado), `review.py` (revisión, resumen por jugador,
+  momentos clave con perspectiva), `positions.py` (posiciones con historia reversible y clave
+  de caché).
+- **Motor y trabajo:** `engine/pool.py` (motores de análisis aparte del de juego, se arrancan
+  por análisis y se cierran al terminar), `analysis/runner.py` (`AnalysisService`: un análisis a
+  la vez, caché `PositionAnalysis`, progreso, análisis interrumpidos → fallidos al arrancar).
+- **API:** `POST|GET /api/games/{id}/analysis`, `GET .../analysis/stream` (SSE nativo de
+  FastAPI: `progress`, `done`, `failed`), `GET .../review`. La revisión se recalcula en cada
+  petición desde la caché (ajustar umbrales no exige reanalizar).
+- **CLI:** `make analyze PGN=…` imprime la tabla de jugadas clasificadas y el tiempo.
+- **Tests:** 167 rápidos (`make test`), integración con Stockfish real: fixtures reales a
+  profundidad 20 + aceptación (Byrne–Fischer, 82 medias jugadas, **11,2 s** con ajustes por
+  defecto vía API). `pytest tests/analysis` pasa (las 4 posiciones en disputa como xfail).
+- Bugs encontrados y corregidos durante la fase: `POST /analysis` síncrono no podía crear la
+  tarea (sin event loop); el 404 del SSE se lanzaba dentro del generador (demasiado tarde).
+
 ## Pendiente / siguiente paso
-- Fase 2 (nueva conversación): proponer plan y esperar OK.
+- **Revisión de fixtures por el usuario** (`tests/fixtures/classification/real_positions.json`,
+  partidas en `tests/fixtures/games/`).
+- **Decisiones en disputa** (cada una con su fixture en xfail):
+  1. Libro con trampas: el dataset incluye "Barnes Opening: Fool's Mate", así que 2.g4?? sale
+     📖. Propuesta: una jugada de libro solo es Teoría si Δ < 10.
+  2. …Be6 (Byrne–Fischer): la dama ya estaba en prise antes y el motor no la come en su línea,
+     así que sale "!". Propuesta: contar también una pieza que ya estaba en prise si podía
+     ponerse a salvo y se deja.
+  3. 24.Rxd4 (Kasparov–Topalov): mejor jugada pero win% después 46,5 < 50 (regla 4) → "★".
+     Decidir umbral (p. ej. 45) o mantener 50.
+- Tras decidir: aplicar, quitar `disputed` de los fixtures y cerrar la Fase 2.
 - La UI de juego no tiene tests de navegador reales (arrastrar y soltar, promoción): solo
   Vitest + pruebas por API. Valorar tests E2E más adelante.
 
@@ -109,6 +139,18 @@ se empieza en una conversación nueva: leer SPEC + ROADMAP + este archivo y prop
 - **Reloj:** descartado (eliminado de SPEC §1.1).
 - **Pruebas manuales aisladas:** nunca contra `data/whyfish.db` ni el `make dev` del usuario;
   base temporal (`DATABASE_URL`) y otro puerto, comprobando antes los puertos (CLAUDE.md).
+- **Fase 2:** gran jugada = mejor jugada (no única ni recaptura obvia) con 2.ª opción ≥ 10
+  peor o de otra categoría (ganado > 75, perdido < 25). Momentos clave centrados en el usuario
+  (errores por Δ ≥ 5, luego ! y !!; nunca jugadas del bot), con parámetro de perspectiva.
+  Brillante: cualquier pieza propia que quede en prise (SEE, neto de lo capturado) y antes no lo
+  estuviera, o caída de material ≥ 2 en un horizonte de 6 medias jugadas (se extiende si hay un
+  intercambio en curso); se quitó "o mejora clara" de la regla 4 (no definible). Δ desde el
+  MultiPV si la jugada está entre las líneas; si no, evaluación de la posición siguiente; Δ ≥ 0.
+  Posiciones terminales sin motor. Valores por defecto: 0,5 s/posición, MultiPV 3, pool
+  = núcleos − 1 (1–4), 1 hilo y 32 MB por motor.
+- **Repeticiones (viable, hecho):** el motor recibe la posición raíz desde la última jugada
+  irreversible + las jugadas reversibles (python-chess envía `position fen … moves …`); la
+  clave de caché es esa misma información, así que la caché sigue siendo por posición.
 - **Tests de integración aparte:** marcador `integration`, `make test-integration`, tiempos de
   búsqueda reducidos; `make test` no los ejecuta.
 - **Un comando UCI a la vez por motor:** todo acceso al motor pasa por el lock de
@@ -126,6 +168,9 @@ se empieza en una conversación nueva: leer SPEC + ROADMAP + este archivo y prop
 
 ## Deuda técnica / dudas abiertas
 - Elo de Principiante/Novato aproximado y sin calibrar.
+- La suite de integración tarda ~2,5 min por los fixtures a profundidad 20; bajar la
+  profundidad podría cambiar resultados. Valorar.
+- El libro tarda ~1,8 s en cargarse la primera vez (después queda en memoria).
 - SQLite se usa con sesión síncrona dentro de endpoints async: bloquea el event loop unos ms
   por petición. Aceptable para un solo usuario; revisar si molesta en la Fase 2 (SSE).
 - Starlette avisa de que `httpx` está deprecado para `TestClient` en favor de `httpx2`.

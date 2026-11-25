@@ -21,8 +21,8 @@
 ### 1.3 Revisión (Game Review)
 - Barra de evaluación + gráfica de evaluación a lo largo de la partida (clic → ir a jugada).
 - Lista de jugadas con símbolo e icono de color por clasificación.
-- Resumen: precisión por jugador, recuento por categoría, **3–5 momentos clave**
-  (los mayores cambios de probabilidad de victoria) destacados para revisar primero.
+- Resumen: precisión por jugador, recuento por categoría y **hasta 5 momentos clave**
+  destacados para revisar primero (ver §3.4).
 - Al seleccionar una jugada:
   - Flecha de la jugada hecha y de la mejor jugada.
   - **Nivel 1 — explicación simple** (1–2 frases, siempre visible).
@@ -38,6 +38,10 @@
 - Análisis como **trabajo en segundo plano** con progreso vía SSE; resultados cacheados
   en SQLite por FEN + ajustes del motor.
 - Normalizar todas las evaluaciones al punto de vista del jugador que mueve.
+- El motor recibe cada posición **con su historial reversible** (las jugadas desde la última
+  captura o movimiento de peón), para que detecte repeticiones. La clave de caché es esa
+  misma información (posición raíz + jugadas), así que dos partidas que llegan a la misma
+  posición con la misma historia reversible comparten caché.
 - Análisis en paralelo con un pool de varios motores. Número de motores (`ENGINE_POOL_SIZE`)
   y tiempo/profundidad por posición configurables en `config.py` / `.env`.
 
@@ -70,23 +74,34 @@ umbrales de Δ** (Excelente, Buena, Imprecisión, Error, Grave error). Gana la p
 ### 3.1 Brillante (!!)
 Todas deben cumplirse:
 1. Es la mejor jugada o casi (Δ < 2).
-2. Implica un **sacrificio real**: el material del jugador baja tras la variante principal
-   a corto plazo (≥ 2 puntos, o una pieza menor/torre que queda en prise) y no se recupera
-   inmediatamente con una recaptura obvia.
+2. Implica un **sacrificio real**, en cualquiera de estas formas:
+   - el material del jugador baja ≥ 2 puntos al final de un horizonte corto de la variante
+     principal (configurable) y no se recupera inmediatamente con una recaptura obvia; o
+   - tras la jugada, **cualquier pieza propia** (no solo la movida) queda en prise según el SEE
+     —el rival ganaría ≥ 2 puntos capturándola, descontando lo que capturó la propia jugada— y
+     antes no lo estaba (p. ej. Byrne–Fischer 1956, …Be6!!, que deja colgada la dama).
 3. La posición **no** estaba ya totalmente ganada antes (win% previo < 90).
-4. La posición resultante es buena para el jugador (win% posterior ≥ 50 o mejora clara).
+4. La posición resultante es buena para el jugador (win% posterior ≥ 50).
 
 ### 3.2 Gran jugada (!)
-Es la mejor jugada y además:
-- es **la única jugada buena**: la segunda opción del MultiPV es ≥ 10 puntos de win% peor; o
-- cambia el resultado esperado (p. ej. de perdido a igualado, o de igualado a ganador).
-No marcar como "!" si la jugada es la única legal o una recaptura obvia.
+Es la mejor jugada, no es la única jugada legal ni una recaptura obvia (captura en la casilla
+donde el rival acaba de capturar), y se cumple al menos una de estas condiciones:
+- a) la segunda opción del MultiPV es ≥ 10 puntos de win% peor; o
+- b) la segunda opción cambia de **categoría de resultado** respecto a la mejor: ganado
+  (win% > 75), igualado o perdido (win% < 25). Umbrales configurables.
 
 ### 3.3 Precisión
 Precisión por jugada a partir de Δ (fórmula tipo Lichess), media ponderada por la
 volatilidad de la posición. Documentar la fórmula exacta en el código.
 
-### 3.4 Tests de clasificación
+### 3.4 Momentos clave
+Centrados en el jugador humano (parámetro de *perspectiva*: el color del usuario; en partidas
+importadas habrá que indicarlo). Hasta 5, en este orden:
+1. sus jugadas ?!, ?, ?? y oportunidades perdidas, por Δ descendente (solo Δ ≥ 5);
+2. si quedan huecos, sus jugadas ! y !!.
+Las jugadas del bot (o del rival) nunca son momentos clave.
+
+### 3.5 Tests de clasificación
 `tests/fixtures/` contiene posiciones con la clasificación esperada: sacrificios
 brillantes conocidos (p. ej. de partidas clásicas), "única jugada" en finales, errores
 graves tácticos, recapturas obvias (no deben ser "!"). Los umbrales se ajustan contra estos fixtures.

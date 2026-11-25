@@ -8,6 +8,7 @@ import chess.engine
 import pytest
 from fastapi.testclient import TestClient
 
+from app.analysis.types import EngineLine
 from app.config import Settings
 from app.engine.stockfish import Engine, EngineOptions, EngineUnavailableError
 from app.main import EngineFactory, create_app
@@ -39,6 +40,9 @@ class FakeEngine:
     )
     play_calls: list[PlayCall] = field(default_factory=list)
     evaluate_calls: int = 0
+    # Analysis: lines per EPD; positions not listed get the first legal moves with cp 0.
+    analyses: dict[str, tuple[EngineLine, ...]] = field(default_factory=dict)
+    analyse_calls: list[chess.Board] = field(default_factory=list)
     closed: bool = False
 
     @property
@@ -76,6 +80,15 @@ class FakeEngine:
         self.evaluate_calls += 1
         return self.evaluation
 
+    async def analyse(
+        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+    ) -> tuple[EngineLine, ...]:
+        self.analyse_calls.append(board.copy())
+        if board.epd() in self.analyses:
+            return self.analyses[board.epd()]
+        moves = sorted(board.legal_moves, key=lambda m: m.uci())[:multipv]
+        return tuple(EngineLine(moves=(m.uci(),), cp=0) for m in moves)
+
     async def close(self) -> None:
         self.closed = True
 
@@ -106,7 +119,12 @@ def fake_engine() -> FakeEngine:
 
 @pytest.fixture
 def client(settings: Settings, fake_engine: FakeEngine) -> Iterator[TestClient]:
-    with TestClient(create_app(settings, engine_factory=factory_for(fake_engine))) as c:
+    app = create_app(
+        settings,
+        engine_factory=factory_for(fake_engine),
+        analysis_engine_factory=factory_for(fake_engine),
+    )
+    with TestClient(app) as c:
         yield c
 
 
