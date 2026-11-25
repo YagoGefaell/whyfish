@@ -34,6 +34,11 @@ Documentos de referencia (léelos antes de empezar cualquier fase):
 - **Gestión:** `uv` para Python, `pnpm` para el frontend. Un `Makefile`
   con `dev`, `test`, `lint` (sin justfile).
 
+## Despliegue objetivo
+Raspberry Pi (ARM64) en LAN. No introducir dependencias solo x86. Todo ajuste de rendimiento
+del motor (motores en paralelo, hilos, hash, tiempo por posición) configurable por `.env`.
+Nada de Docker/compose/despliegue hasta la Fase 8.
+
 ## Estructura
 ```
 backend/

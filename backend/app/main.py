@@ -11,6 +11,9 @@ from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
 
 logger = logging.getLogger(__name__)
 
+# Every backend route lives under this prefix, in dev (Vite proxy) and in production alike.
+API_PREFIX = "/api"
+
 EngineFactory = Callable[[Settings], Awaitable[Engine]]
 
 
@@ -26,7 +29,7 @@ def create_app(
         try:
             engine_state.engine = await engine_factory(resolved_settings)
         except EngineUnavailableError as exc:
-            # The API still starts; /health reports the problem with a 503.
+            # The API still starts; /api/health reports the problem with a 503.
             logger.error("Engine unavailable: %s", exc)
             engine_state.error = str(exc)
         app.state.engine_state = engine_state
@@ -37,7 +40,7 @@ def create_app(
                 await engine_state.engine.close()
 
     app = FastAPI(title="whyfish", lifespan=lifespan)
-    app.include_router(health.router)
+    app.include_router(health.router, prefix=API_PREFIX)
     return app
 
 

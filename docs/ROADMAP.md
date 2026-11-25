@@ -6,7 +6,7 @@ Cada fase termina con algo usable y comprobable. No empezar una fase sin cerrar 
 ## Fase 0 — Esqueleto
 - Monorepo `backend/` + `frontend/`, `uv`, `pnpm`, `Makefile`, `.env.example`, ruff/mypy/eslint.
 - Wrapper de Stockfish: arranque, configuración, cierre limpio, healthcheck.
-- **Aceptación:** `make dev` levanta ambos; `GET /health` devuelve versión de Stockfish; `make test` pasa.
+- **Aceptación:** `make dev` levanta ambos; `GET /api/health` devuelve versión de Stockfish; `make test` pasa.
 
 ## Fase 1 — Jugar contra el bot
 - Tablero en React con drag & drop, promoción, último movimiento resaltado, girar tablero.
@@ -51,3 +51,12 @@ Cada fase termina con algo usable y comprobable. No empezar una fase sin cerrar 
 - Importar partidas desde Lichess/Chess.com.
 - Estadísticas por patrón (tipo de error, fase, motivo táctico), aperturas problemáticas.
 - Ejercicios generados a partir de los propios errores (repetición espaciada).
+
+## Fase 8 — Despliegue en Raspberry Pi (opcional)
+- Imagen Docker para ARM64 (o multi-arch) con frontend compilado servido por el backend.
+- `compose.yaml` con `restart: unless-stopped` y volumen para la base SQLite.
+- Stockfish para ARM (build oficial `linux-arm64`) dentro de la imagen.
+- Límites de CPU y memoria del contenedor y ajustes del motor por `.env`.
+- Acceso en la LAN; Tailscale opcional para acceder desde fuera. Sin exposición pública a internet.
+- **Aceptación:** la app arranca sola en la Pi tras reiniciarla y es accesible desde otro
+  dispositivo de la red.

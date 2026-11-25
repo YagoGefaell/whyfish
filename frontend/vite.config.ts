@@ -9,11 +9,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      // Frontend calls /api/*; the backend serves routes without prefix.
+      // Backend routes already live under /api: plain proxy, no rewrite.
       '/api': {
         target: BACKEND_URL,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

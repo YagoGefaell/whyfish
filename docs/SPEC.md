@@ -140,6 +140,8 @@ Implementaciones: Anthropic, OpenAI, Ollama, None. Configuración solo por `.env
 Registrar tokens usados por partida en logs.
 
 ## 6. API (orientativa)
+Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desarrollo y en producción.
+
 - `POST /games` crear partida (color, nivel) · `POST /games/{id}/moves` jugada del usuario → respuesta del motor
 - `POST /games/import` (PGN/FEN)
 - `POST /games/{id}/analysis` lanza análisis · `GET /games/{id}/analysis/stream` (SSE progreso)
@@ -153,4 +155,6 @@ SQLite: `Game`, `Move`, `PositionAnalysis` (cache por FEN+ajustes), `Explanation
 `ChatMessage`. Migraciones simples (Alembic o recreación en dev, decidir en fase 1).
 
 ## 8. Fuera de alcance (por ahora)
-Multijugador, cuentas de usuario, despliegue online, móvil nativo, entrenamiento de modelos propios.
+Multijugador, cuentas de usuario, exposición pública a internet, móvil nativo, entrenamiento de
+modelos propios. El despliegue en una Raspberry Pi doméstica (LAN, Tailscale opcional) es un
+objetivo final (ROADMAP Fase 8).

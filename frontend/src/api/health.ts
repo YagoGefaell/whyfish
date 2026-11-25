@@ -9,7 +9,7 @@ export interface HealthResponse {
   engine: EngineHealth
 }
 
-/** GET /health. A 503 still carries a HealthResponse body describing the problem. */
+/** GET /api/health. A 503 still carries a HealthResponse body describing the problem. */
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   const response = await fetch('/api/health', { signal })
   if (response.ok || response.status === 503) {

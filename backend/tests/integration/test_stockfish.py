@@ -30,7 +30,7 @@ async def test_start_ping_and_close() -> None:
 
 
 async def test_concurrent_pings_do_not_interfere() -> None:
-    # Regression: concurrent /health requests used to cancel each other's ping.
+    # Regression: concurrent /api/health requests used to cancel each other's ping.
     engine = await StockfishEngine.start(_settings)
     try:
         await asyncio.gather(*(engine.ping() for _ in range(5)))
@@ -49,7 +49,7 @@ async def test_close_is_safe_when_process_already_died() -> None:
 
 def test_health_endpoint_with_real_engine() -> None:
     with TestClient(create_app(_settings)) as c:
-        response = c.get("/health")
+        response = c.get("/api/health")
 
     assert response.status_code == 200
     assert response.json()["engine"]["name"].startswith("Stockfish")

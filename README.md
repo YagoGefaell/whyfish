@@ -29,4 +29,4 @@ make dev                  # backend en :8000, frontend en http://localhost:5173
 ```
 
 Otros comandos: `make test`, `make lint`, `make fmt` (`make help` para la lista).
-`GET /health` (o `/api/health` desde el frontend) devuelve el estado y la versión de Stockfish.
+Todas las rutas del backend van bajo `/api`. `GET /api/health` devuelve el estado y la versión de Stockfish.

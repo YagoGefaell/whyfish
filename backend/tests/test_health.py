@@ -7,7 +7,7 @@ from tests.conftest import FakeEngine
 
 
 def test_health_ok_reports_engine_name(client: TestClient) -> None:
-    response = client.get("/health")
+    response = client.get("/api/health")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -21,7 +21,7 @@ def test_health_503_when_engine_stops_responding(
 ) -> None:
     fake_engine.responsive = False
 
-    response = client.get("/health")
+    response = client.get("/api/health")
 
     assert response.status_code == 503
     body = response.json()
@@ -35,7 +35,7 @@ def test_app_starts_and_reports_503_when_engine_fails_to_start(settings: Setting
         raise EngineUnavailableError("boom")
 
     with TestClient(create_app(settings, engine_factory=failing_factory)) as c:
-        response = c.get("/health")
+        response = c.get("/api/health")
 
     assert response.status_code == 503
     assert response.json()["engine"] == {"status": "unavailable", "name": None, "detail": "boom"}
@@ -43,7 +43,7 @@ def test_app_starts_and_reports_503_when_engine_fails_to_start(settings: Setting
 
 def test_missing_stockfish_path_is_reported(settings: Settings) -> None:
     with TestClient(create_app(settings, engine_factory=StockfishEngine.start)) as c:
-        response = c.get("/health")
+        response = c.get("/api/health")
 
     assert response.status_code == 503
     assert "STOCKFISH_PATH" in response.json()["engine"]["detail"]
