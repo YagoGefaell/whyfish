@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 4 (hechos y explicaciones por plantilla) — **implementada, pendiente de la revisión del
-informe por el usuario**. Siguiente: Fase 5 "Ver por qué" (proponer el plan y esperar OK).
+Fase 4 (hechos y explicaciones por plantilla) — **cerrada** (2026-11-26, informe aprobado por el
+usuario). Siguiente: Fase 5 "Ver por qué" (plan propuesto, pendiente de OK).
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -153,7 +153,7 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   `frontend/e2e-artifacts/board-*.png`. Lichess bloquea navegadores headless (Cloudflare), así
   que la comparación se hizo contra el CSS de chessground.
 
-### Fase 4 — Hechos y explicaciones por plantilla (pendiente de revisión)
+### Fase 4 — Hechos y explicaciones por plantilla (cerrada 2026-11-26)
 - **Hechos** (`analysis/facts.py` + `analysis/detectors/`): piezas colgadas (SEE), amenazas
   creadas y neutralizadas, mate en 1 como amenaza, doble ataque, clavada, ataque a la
   descubierta, jaque doble, resultado de cada línea (material cerrado con SEE, mate, capturas,
@@ -187,12 +187,16 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   `*-review-explanation.png`.
 
 ## Pendiente / siguiente paso
-- **Fase 4 implementada, pendiente de la revisión del usuario** (no cerrar hasta su OK).
-  Informe: `docs/reports/explanations-fase4.html` (regenerar con `make explain-report`).
-- Después: plan de la Fase 5 "Ver por qué".
+- Fase 5 "Ver por qué": plan propuesto, esperar OK del usuario antes de escribir código.
+- Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
+  `make explain-report`).
   acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 5).
 
 ## Decisiones tomadas
+- **Fase 4 (aprobadas por el usuario, 2026-11-26):** una ganancia o pérdida solo se afirma si su
+  punto de consecuencia está dentro de la línea y a ≤ 20 medias jugadas (el mismo límite que
+  "Ver por qué"); ~25 ms por explicación, sin caché. Sin LLM: explicaciones siempre por
+  plantilla.
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
   plantillas, prompts, UI). Explicaciones en español, jugadas en inglés.
 - **Marcas de jugada:** el texto generado (LLM y plantillas) marca jugadas como `[[Nf3]]`;
