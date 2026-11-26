@@ -194,7 +194,8 @@ def level1(
                     f"{{Subj}} dejaron {es.the(piece)} sin defensa suficiente",
                 )
             joiner = ": " if idea.index == 1 else " y "
-            return f"{head}{joiner}{took}.{better}"
+            worse = _eval_clause(facts, idea.gain)
+            return f"{head}{joiner}{took}{worse}.{better}"
 
         case K.TACTIC_ALLOWED:
             assert pl is not None and idea.motif is not None and idea.index is not None
@@ -207,8 +208,12 @@ def level1(
         case K.LOSES_MATERIAL:
             assert pl is not None
             reply = mt.move(pl, 1)
-            loss = _loss(idea.gain, idea.piece)
-            return f"Esta jugada pierde {loss}: la refutación empieza con {reply}.{better}"
+            c = pl.consequence
+            loss = es.exchange(c.lost, c.won) if c.settled and c.lost else _loss(idea.gain, None)
+            worse = _eval_clause(facts, idea.gain)
+            return (
+                f"Esta jugada pierde {loss}: la refutación empieza con {reply}{worse}.{better}"
+            )
 
         case K.MISSED_GAIN:
             assert best is not None and bl is not None
@@ -218,10 +223,17 @@ def level1(
             elif idea.piece is not None:
                 text = f"{error_prefix}{best} ganaba {es.the(idea.piece)}."
             else:
-                stop = min((bl.last_mover_capture or 0) + 1, 5)
+                c = bl.consequence
+                point = c.ply if c.ply is not None else 0
+                stop = min(point + 1, t.commented_line_plies)
                 follow = " ".join(mt.moves(bl, 1, stop))
                 tail = f": sigue {follow}" if follow else ""
-                text = f"{error_prefix}{best} ganaba {es.material(idea.gain)}{tail}."
+                if pl is not None and pl.material > 0:
+                    # The move played wins something too: the difference is what was missed.
+                    won = es.more(bl.material - pl.material)
+                else:
+                    won = es.exchange(c.won, c.lost) if c.won else es.material(idea.gain)
+                text = f"{error_prefix}{best} ganaba {won}{tail}."
             return es.capitalize(text)
 
         case K.POSITIONAL:
@@ -348,6 +360,25 @@ def level1(
             me = mt.move(pl, 0) if pl else facts.san
             return f"{me} {_parried_clause(idea.parried)}."
     return None
+
+
+def _eval_clause(facts: MoveFacts, lost: int) -> str:
+    """For ? and ??, when the material lost is small (a pawn or two) the evaluation explains
+    the rest: ' y la ventaja se esfuma'. Empty otherwise."""
+    if facts.classification not in (C.MISTAKE, C.BLUNDER) or lost > 2:
+        return ""
+    bl, pl = facts.best_line, facts.played_line
+    if bl is None or pl is None:
+        return ""
+    good, bad = bl.win, pl.win
+    win, lose = THRESHOLDS.winning_above, THRESHOLDS.losing_below
+    if good > win and bad < lose:
+        return " y la posición se da la vuelta"
+    if good > win and bad <= win:
+        return " y la ventaja se esfuma"
+    if bad < lose <= good:
+        return " y la posición queda perdida"
+    return " y la posición empeora claramente"
 
 
 def _only_move_consequence(

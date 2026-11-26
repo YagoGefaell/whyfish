@@ -41,13 +41,13 @@
   - **Mejor jugada automática:** si la jugada hecha no es la mejor (excelente, buena, ?!, ?, ??,
     ✗) se muestran la flecha verde en el tablero y "La mejor era X"; **"Ver línea"** despliega
     su continuación clicable. Si es la mejor (★, !, !!, libro) no se muestra ninguna alternativa.
-  - Fila de acciones que crece por fases: **"Profundizar"** (nivel 2, Fase 4) y
-    **"Pruébalo tú"** (en errores: repetir la posición e intentar encontrar la mejor jugada).
+  - Fila de acciones que crece por fases: **"Profundizar"** (nivel 2, Fase 4), **"Ver por
+    qué" / "Ver la idea"** y **"Pruébalo tú"** (Fase 5, §5.4).
   - "Detalles del motor" plegado (recuerda su estado): % de victoria, Δ, evaluación y líneas.
   - **Nivel 1 — explicación simple** (1–2 frases, siempre visible).
   - **Nivel 2 — "Profundizar"**: amenazas, variante principal comentada, comparación con
     la mejor jugada, conceptos implicados.
-  - **Nivel 3 — "Pregunta al coach"**: chat sobre esa posición ("¿y si juego Nxe5?").
+  - **"Ver por qué"**: el tablero reproduce la secuencia hasta su consecuencia (Fase 5).
 - **Explorar variantes** en el tablero (salir de la línea de la partida y volver), con
   evaluación del motor (`POST /api/analysis/evaluate`, ~0,3 s, con debounce) en la barra y
   flecha con la mejor jugada.
@@ -115,14 +115,18 @@ Todas deben cumplirse:
      captura no está en el MultiPV del rival (≥ 2 líneas), es peor para él que la última línea
      listada, cuya evaluación sirve de cota (Kasparov 24.Rxd4!!: el motor prefiere …Kb6).
      Si alguna captura no se puede comprobar, no es !!.
-3. La posición **no** estaba ya totalmente ganada antes (win% previo < 90).
+3. La posición **no** estaba ya totalmente ganada antes (win% previo < 90) y el jugador **no
+   iba ya por debajo en material** (resuelto) antes de la jugada: una entrega que continúa una
+   combinación propia no es una !! nueva (Kasparov–Topalov: solo 24.Rxd4 y 37.Rd7).
 4. La posición resultante es al menos igualada para el jugador (win% posterior ≥ 45,
    configurable; p. ej. Kasparov–Topalov 1999, 24.Rxd4!!, ≈ 46 %).
 
 ### 3.2 Gran jugada (!)
 Es la mejor jugada, no es la única jugada legal, ni una recaptura obvia (captura en la casilla
-donde el rival acaba de capturar), ni un **mate en una** (esos quedan como ★), y se cumple al
-menos una de estas condiciones:
+donde el rival acaba de capturar), ni un **mate en una**, ni la captura de una pieza que el rival
+dejó en prise (gana material aun tras la mejor recaptura, por SEE: castigar un error obvio), y
+la posición **no** estaba ya ganada (win% previo < 85: mantener una ventaja decisiva no es
+notable). Esas quedan como ★. Además se cumple al menos una de estas condiciones:
 - a) la segunda opción del MultiPV es ≥ 10 puntos de win% peor; o
 - b) la segunda opción cambia de **categoría de resultado** respecto a la mejor: ganado
   (win% > 75), igualado o perdido (win% < 25). Umbrales configurables.
@@ -171,11 +175,11 @@ MultiPV ya guardadas por el análisis (antes y después de la jugada) + python-c
 a llamar al motor.
 
 Reglas para no afirmar de más (Fase 4):
-- El material de una línea se cuenta en las primeras 6 medias jugadas (alargando si hay un
-  intercambio en curso) y se cierra con SEE. "Gana / ganaba X" solo si la captura que lo
-  consigue está entre las 5 primeras medias jugadas de la línea (las que el texto muestra), no
-  solo en el cierre con SEE, y —para jugadas buenas— si la línea deja al que mueve con ≥ 55 % de
-  victoria (si no, suele ser un sacrificio rival a medias).
+- El material de una línea es el de su **punto de consecuencia** (§5.3: resuelto, nunca a
+  mitad de un intercambio). "Gana / ganaba / pierde X" solo si ese punto está dentro de la
+  línea y a ≤ 20 medias jugadas (lo que "Ver por qué" reproducirá) y —para jugadas buenas— si
+  la línea deja al que mueve con ≥ 55 % de victoria (si no, suele ser un sacrificio rival a
+  medias).
 - Una pieza se nombra ("pierdes el caballo de c3") solo si explica la diferencia y el otro bando
   no recuperó más que peones.
 - Doble ataque y clavada exigen que la pieza que ataca no se pueda ganar (SEE).
@@ -199,16 +203,20 @@ Reglas para no afirmar de más (Fase 4):
   "Dejaste el caballo de f3 sin defensa; tras …[[Bxf3]] pierdes una pieza. Mejor era [[Be2]]."
 - **Nivel 2 (profundizar):** 1 párrafo + variante comentada jugada a jugada, comparación
   hecha vs. mejor, concepto general aplicable ("antes de mover, revisa qué deja de defender la pieza").
-- **Nivel 3 (chat):** el LLM recibe la posición, los hechos y **herramientas**
-  (`evaluate_position(fen)`, `analyze_move(fen, san)`, `get_threats(fen)`,
-  `legal_moves(fen)`) y responde solo con datos obtenidos de ellas.
+- **Ver por qué / Ver la idea (Fase 5):** el tablero reproduce la secuencia hasta el punto de
+  consecuencia (§5.4).
 
 **Idea principal** (`explain/idea.py`), por prioridad:
-- Errores (?!, ?, ??): mate permitido > mate perdido > pieza colgada > táctica permitida
-  (doble ataque, clavada…) > material perdido > material que ganaba la mejor > comentario
+- Errores (?!, ?, ??): mate permitido > mate perdido > **la mayor consecuencia de la
+  refutación** en su punto de consecuencia (§5.3): pieza colgada o táctica permitida solo si
+  explican ese material perdido (un peón atacado no es la idea si la línea pierde la dama);
+  si no, «pierde la dama a cambio de un caballo» > material que ganaba la mejor > comentario
   posicional (debilidad del enroque, peones doblados/aislados solo en ?!; motivo de la mejor:
   enroque, desarrollo, amenaza, defensa). Si no hay hechos, una frase prudente sin motivo.
-- Oportunidad perdida (✗): mate perdido > material perdido primero.
+- Si en ? o ?? el material perdido es pequeño (≤ 2), se añade lo que dice la evaluación
+  («…y la ventaja se esfuma», «…y la posición empeora claramente»).
+- Oportunidad perdida (✗): mate perdido > material que ganaba la mejor (si la jugada hecha
+  también ganaba algo, la diferencia: «ganaba dos peones más»).
 - Gran jugada (!): **por qué fallaban las alternativas**, con la segunda línea del MultiPV
   («[[X]] era la única: si [[Y]], sigue [[Z]] y …»). Si además fuerza mate, el mate va primero.
 - Brillante (!!): el sacrificio primero.
@@ -226,23 +234,24 @@ jugada buena, casilla ámbar para la pieza objetivo o salvada. El nivel 1 dibuja
 idea principal (máx. 3 elementos); el nivel 2 puede mostrar hasta 6.
 
 ### 5.2 Generación
-1. **Plantillas deterministas** (proveedor `none`) para todos los niveles 1 y 2. Siempre disponibles.
-2. Con LLM: prompt de sistema fijo + `MoveFacts` en JSON + nivel del usuario. Instrucciones:
-   usar solo los hechos, no inventar jugadas, no dar evaluaciones numéricas salvo que se pidan,
-   tono de entrenador amable, en español. Jugadas **siempre en SAN inglés** (K, Q, R, B, N)
-   y **marcadas como `[[Nf3]]`**.
-3. **Validación posterior:** extraer todas las marcas `[[...]]` del texto; cada jugada debe existir
-   en los hechos o ser legal en el contexto citado. Si falla → reintento con el error → si vuelve a
-   fallar, plantilla. Las plantillas usan el mismo formato de marcas.
-4. **Frontend:** renderiza cada `[[SAN]]` como una jugada clicable que se muestra en el tablero.
-5. Caché por `(fen, move, level, provider, model, prompt_version)` (tabla `Explanation`, en la
-   Fase 5: las plantillas se calculan bajo demanda en milisegundos).
-6. Generación perezosa: nivel 1 para momentos clave al terminar el análisis; el resto bajo demanda.
+1. **Solo plantillas deterministas** (`explain/templates.py`) para los niveles 1 y 2, calculadas
+   bajo demanda (milisegundos; sin caché).
+2. Jugadas **siempre en SAN inglés** (K, Q, R, B, N) y **marcadas como `[[Nf3]]`**; el validador
+   de marcas (`explain/marks.py`) comprueba que cada una está en los hechos. Se conserva por si
+   se retoma una IA (ROADMAP, "Ideas futuras").
+3. **Frontend:** renderiza cada `[[SAN]]` como una jugada clicable que se muestra en el tablero.
 
-### 5.3 Proveedores
-Interfaz `LLMProvider` con `complete(messages, tools=None)` y `stream(...)`.
-Implementaciones: Anthropic, OpenAI, Ollama, None. Configuración solo por `.env`.
-Registrar tokens usados por partida en logs.
+### 5.3 Punto de consecuencia (`analysis/consequence.py`)
+Función pura compartida por el texto de nivel 1 y "Ver por qué": dada una línea (posición +
+jugadas UCI) devuelve el ply donde se materializa lo que hace mala (o buena) la jugada —mate,
+coronación o el último cambio de material **resuelto** (quiescencia; nunca a mitad de un
+intercambio)— y el balance resuelto en ese punto respecto al inicio (p. ej. "pierdes la dama
+por un caballo"). En ?? y ? la idea principal del nivel 1 es la mayor consecuencia de la
+refutación (mate > material perdido al final de la línea resuelta), no un hecho menor.
+
+### 5.4 Ver por qué (Fase 5)
+Detalle en ROADMAP Fase 5: reproducción paso a paso hasta el punto de consecuencia, frases por
+paso desde los hechos, resumen final, extensión de líneas cortas con el motor y "Pruébalo tú".
 
 ## 6. API (orientativa)
 Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desarrollo y en producción.
@@ -252,21 +261,22 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
 - `POST /games/{id}/analysis` lanza análisis · `GET /games/{id}/analysis/stream` (SSE progreso)
 - `GET /games/{id}/review` resumen + jugadas clasificadas
 - `POST /analysis/evaluate` (`{fen, moves?, multipv?}`): evaluación bajo demanda con el pool de
-  análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada. Herramienta del coach (Fase 6).
+  análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada (lo usa "Pruébalo tú").
 - `GET /games/{id}/moves/{ply}/explanation?level=1|2` → `{ply, level, text, refs, annotations,
   idea}`: `text` con marcas `[[SAN]]` (null si no hay nada que decir), `refs` una por marca en
   orden (`{san, line, base, path}`: jugadas UCI desde la posición `base` de la partida, para
   mostrarla en el tablero), `annotations` (flechas/casillas con su papel).
-- `POST /games/{id}/moves/{ply}/chat` (streaming)
+- `GET /games/{id}/moves/{ply}/why?kind=refutation|idea` → `{steps: [{san, uci, fen, caption,
+  annotations}], consequence_ply, summary}` (Fase 5).
 - `GET /games` historial
 
 ## 7. Persistencia
 SQLite: `Game`, `Move`, `AnalysisJob`, `PositionAnalysis` (caché por posición + historia
-reversible + ajustes), `Explanation` (caché), `ChatMessage`. Migraciones con **Alembic**
+reversible + ajustes). Migraciones con **Alembic**
 (`backend/migrations/`), aplicadas al arrancar; una base anterior a Alembic se marca con la
 revisión base y se migra.
 
 ## 8. Fuera de alcance (por ahora)
 Multijugador, cuentas de usuario, exposición pública a internet, móvil nativo, entrenamiento de
 modelos propios. El despliegue en una Raspberry Pi doméstica (LAN, Tailscale opcional) es un
-objetivo final (ROADMAP Fase 8).
+objetivo final (ROADMAP Fase 7).

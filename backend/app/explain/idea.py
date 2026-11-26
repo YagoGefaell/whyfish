@@ -164,6 +164,7 @@ def valid_annotations(
 
 
 def _material_error(facts: MoveFacts, t: FactThresholds) -> bool:
+    """The refutation loses material at its consequence point, and the best line less."""
     pl, bl = facts.played_line, facts.best_line
     if pl is None or pl.material > -t.material_min:
         return False
@@ -201,14 +202,19 @@ def _motif_annotations(motif: Motif, role_target: Role, by_role: Role) -> list[A
 
 
 def shown_gain(line: LineOutcome, t: FactThresholds) -> bool:
-    """The line wins material through its own moves (a capture of the mover is shown), not
-    only through a capture still pending at its end."""
-    capture = line.last_mover_capture
+    """The line wins material and its consequence point (SPEC §5.3) is inside the line, close
+    enough to be shown ("Ver por qué" replays up to it)."""
+    return shown_change(line, t) and line.material >= t.material_min
+
+
+def shown_change(line: LineOutcome, t: FactThresholds) -> bool:
+    """The line's material consequence is settled within `consequence_text_max_plies`."""
+    c = line.consequence
     return (
-        line.material >= t.material_min
-        and line.material - line.settled >= t.material_min
-        and capture is not None
-        and capture <= t.motif_plies  # within the plies the text shows
+        c.kind == "material"
+        and c.settled
+        and c.ply is not None
+        and c.ply + 1 <= t.consequence_text_max_plies
     )
 
 
@@ -260,10 +266,14 @@ def _missed_mate(facts: MoveFacts, t: FactThresholds) -> Idea | None:
 
 
 def _hanging(facts: MoveFacts, t: FactThresholds) -> Idea | None:
+    """Only if the hanging piece is what the refutation ends up costing (its consequence
+    point, SPEC §5.3): a pawn left en prise is not the story if the line loses the queen."""
     pl = facts.played_line
     if pl is None or not _material_error(facts, t):
         return None
     for hanging in facts.played.hanging:
+        if hanging.piece.piece not in pl.consequence.lost:
+            continue
         for capture in pl.captures:
             if (
                 capture.index % 2 == 1
@@ -288,7 +298,7 @@ def _hanging(facts: MoveFacts, t: FactThresholds) -> Idea | None:
 
 def _tactic_allowed(facts: MoveFacts, t: FactThresholds) -> Idea | None:
     pl = facts.played_line
-    if pl is None or not _material_error(facts, t):
+    if pl is None or not _material_error(facts, t) or not shown_change(pl, t):
         return None
     for motif in pl.motifs:
         if motif.index % 2 == 1:

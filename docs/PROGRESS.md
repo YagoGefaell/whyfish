@@ -3,8 +3,10 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 3.5 (rediseño de la revisión) — **cerrada** (2026-11-25). Siguiente: Fase 4 (hechos y
-explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el plan.
+Fase 4 (hechos y explicaciones por plantilla) — **implementada, pendiente de la revisión del
+informe por el usuario**. Siguiente: Fase 5 "Ver por qué" (proponer el plan y esperar OK).
+Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
+5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
 ## Hecho
 - Reorganización del repo: `CLAUDE.md` en raíz, docs en `docs/`, README y .gitignore.
@@ -169,13 +171,26 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
   con diagrama, textos y hechos usados marcados. Las partidas del usuario se leyeron de
   `data/whyfish.db` en solo lectura (SHA-1 comprobado antes y después) y se analizaron en una base
   temporal.
-- **Tests:** backend 291 (detectores, sacrificio, explicaciones, API, informe), frontend 45, e2e
-  con captura `*-review-explanation.png`.
+- **Punto de consecuencia** (`analysis/consequence.py`, SPEC §5.3): el material de cada línea es
+  el del ply donde se materializa (resuelto por quiescencia, nunca a mitad de un intercambio;
+  mate y coronación incluidos), con piezas perdidas/ganadas netas. Lo usan las ideas de error
+  («pierde la dama a cambio de un caballo»), las ganancias y será la base de "Ver por qué".
+  En ? y ?? la idea es la mayor consecuencia de la refutación (pieza colgada solo si es lo que
+  se pierde); con poco material perdido se añade lo que dice la evaluación. ~25 ms por
+  explicación (antes ~8): la quiescencia en cada ply.
+- **Clasificación (2026-11-26):** sacrificio = captura legal con SEE favorable + material
+  resuelto + alternativa + verificación con el motor (cota del MultiPV si la captura no está
+  listada); sin !! si ya ibas por debajo en material; sin ! si win% previo ≥ 85 o si se captura
+  una pieza dejada en prise. Morphy 16.Qb8+ pasa de ! a ★ (win% 100). Recuento: tus partidas
+  !! 0 / ! 5 (antes 9); fixtures !! 6 / ! 28.
+- **Tests:** backend 316 + 16 fixtures reales con Stockfish, frontend 45, e2e con captura
+  `*-review-explanation.png`.
 
 ## Pendiente / siguiente paso
 - **Fase 4 implementada, pendiente de la revisión del usuario** (no cerrar hasta su OK).
   Informe: `docs/reports/explanations-fase4.html` (regenerar con `make explain-report`).
-  acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 6).
+- Después: plan de la Fase 5 "Ver por qué".
+  acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 5).
 
 ## Decisiones tomadas
 - **Notación:** SAN en inglés (K, Q, R, B, N) en todo el proyecto (backend, MoveFacts,
@@ -254,6 +269,7 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - `.env` se lee siempre de la raíz del repo; `STOCKFISH_PATH` debe ser ruta absoluta (no se expande `~`).
 
 ## Ideas futuras
+- Explicaciones con LLM y coach con chat (antiguas Fases 5 y 6, ver ROADMAP).
 - Nivel **"Personalizado"** con selector de Elo (1320–3190, rango de `UCI_Elo` en Stockfish 19).
 
 ## Deuda técnica / dudas abiertas
@@ -261,12 +277,9 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
   por el rey, defendida) y 27.Ke1 (partida 6) y 5… Bd6 (partida 1) salían !!. Sacrificio = captura
   legal con SEE favorable al rival + material resuelto por quiescencia + alternativa que lo
   conserva + verificación con las líneas del motor (o cota del MultiPV). Ver SPEC §3.1.
-  Recuento tras el cambio: tus partidas !! 0 / ! 9 (8 en la partida 6); fixtures !! 11 / ! 40.
-- **Pendiente de decisión: una !! por combinación.** Kasparov–Topalov conserva 7 !! (24, 25, 26,
-  28, 30, 36, 37) y Byrne–Fischer 4 (11…Na4, 14…Qb6, 15…Nxc3, 17…Be6). Propuesta: no es !! si
-  el jugador ya iba por debajo en material resuelto (continúa una combinación propia); dejaría
-  24.Rxd4, 37.Rd7 y las 4 de Fischer.
-- **"!" generosa:** 8 grandes jugadas en una partida contra Novato; revisar umbrales de §3.2.
+- **Decidido (2026-11-26):** sin !! si ya ibas por debajo en material; cota del MultiPV OK; "!"
+  más estricta (win% previo < 85, no capturar una pieza dejada en prise).
+- "Pieza atrapada" como punto de consecuencia: solo se detecta cuando la línea la captura.
 - Explicaciones genéricas en ?! posicionales sin hechos (el informe las marca "faltan hechos").
 - Desviación, sobrecarga y rayos X sin detectar (SPEC §4).
 - Elo de Principiante/Novato aproximado y sin calibrar.

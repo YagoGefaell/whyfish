@@ -14,14 +14,12 @@ Documentos de referencia (léelos antes de empezar cualquier fase):
 - `docs/PROGRESS.md` — estado actual. **Lo mantienes tú** al final de cada sesión.
 
 ## Principio central (no negociable)
-**Stockfish calcula, el código extrae hechos, el LLM solo redacta.**
-- El LLM nunca evalúa posiciones ni inventa jugadas o variantes.
-- Todo lo que el LLM puede afirmar sale de un objeto `PositionFacts` / `MoveFacts`
-  calculado con Stockfish + python-chess.
-- Las jugadas en textos generados van marcadas como `[[Nf3]]`; el backend las extrae y
-  valida contra los hechos. Si alguna no está en ellos, la explicación se regenera o se
-  degrada a la plantilla determinista.
-- La app debe funcionar **sin LLM** (explicaciones por plantilla). El LLM es una mejora.
+**Stockfish calcula, el código extrae hechos y redacta con plantillas.**
+- Ninguna explicación evalúa posiciones ni inventa jugadas o variantes: todo lo que se
+  afirma sale de un objeto `MoveFacts` calculado con Stockfish + python-chess.
+- Las jugadas en los textos van marcadas como `[[Nf3]]`; el backend las extrae y valida contra
+  los hechos (validador de marcas: sirve a las plantillas y a una posible IA futura).
+- No hay LLM en el flujo principal (ver "Ideas futuras" en `docs/ROADMAP.md`).
 
 ## Stack
 - **Backend:** Python 3.12, FastAPI, `python-chess` (motor vía `chess.engine`, async),
@@ -29,15 +27,13 @@ Documentos de referencia (léelos antes de empezar cualquier fase):
 - **Motor:** binario de Stockfish local (ruta en `.env`, `STOCKFISH_PATH`).
 - **Frontend:** React + Vite + TypeScript, `chess.js` para reglas en cliente,
   tablero con `react-chessboard` (o `chessground` si se justifica), Tailwind.
-- **LLM:** capa `LLMProvider` con implementaciones `anthropic`, `openai`, `ollama`
-  y `none` (plantillas). Selección por `.env` (`LLM_PROVIDER`, `LLM_MODEL`, claves).
 - **Gestión:** `uv` para Python, `pnpm` para el frontend. Un `Makefile`
   con `dev`, `test`, `lint` (sin justfile).
 
 ## Despliegue objetivo
 Raspberry Pi (ARM64) en LAN. No introducir dependencias solo x86. Todo ajuste de rendimiento
 del motor (motores en paralelo, hilos, hash, tiempo por posición) configurable por `.env`.
-Nada de Docker/compose/despliegue hasta la Fase 8.
+Nada de Docker/compose/despliegue hasta la Fase 7.
 
 ## Estructura
 ```
@@ -46,7 +42,7 @@ backend/
     api/          # routers FastAPI
     engine/       # wrapper Stockfish (pool, análisis, juego)
     analysis/     # clasificación de jugadas, extracción de hechos
-    explain/      # plantillas, prompts, proveedores LLM, validación
+    explain/      # plantillas, validación de marcas, "ver por qué"
     models/       # SQLModel
   tests/
     fixtures/     # PGN/FEN de prueba con resultados esperados

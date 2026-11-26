@@ -202,3 +202,31 @@ def test_obvious_recapture_detection() -> None:
 def test_mate_scores() -> None:
     verdict = classify(inp(START, "e2e4", mate_ev("e2e4", 3)))
     assert verdict.win_before == 100.0 and verdict.delta == 0.0
+
+
+class TestGreatIsRarer:
+    # Only move: Nd5 saves the knight (see test_explanations scenarios); 2nd option loses it.
+    FEN = "4k3/8/8/8/1p6/2N5/3B4/4K3 w - - 0 1"
+
+    def test_only_good_move_is_great(self) -> None:
+        verdict = classify(inp(self.FEN, "c3d5", ev(("c3d5 e8d7", 200), ("e1e2 b4c3", -100))))
+        assert verdict.classification is C.GREAT
+
+    def test_not_great_when_already_winning(self) -> None:
+        # 85%+ before: keeping a won position is not notable.
+        verdict = classify(inp(self.FEN, "c3d5", ev(("c3d5 e8d7", 700), ("e1e2 b4c3", 200))))
+        assert verdict.win_before >= 85
+        assert verdict.classification is C.BEST
+
+    def test_not_great_when_taking_a_piece_left_en_prise(self) -> None:
+        # The black knight on d5 is free: Qxd5 is the only good move, but it is a ★.
+        fen = "4k3/8/8/3n4/8/8/8/3QK3 w - - 0 1"
+        verdict = classify(inp(fen, "d1d5", ev(("d1d5 e8e7", 300), ("e1e2 d5f4", -100))))
+        assert verdict.classification is C.BEST
+
+
+def test_no_brilliant_when_already_down_material() -> None:
+    # Same knight offer, but white is already a rook down (continuing an own combination).
+    fen = "r5k1/5p1p/6p1/8/3N4/8/5PPP/6K1 w - - 0 1"
+    verdict = classify(inp(fen, "d4f5", ev(("d4f5 g6f5", -20), ("d4e2", -40))))
+    assert verdict.classification is not C.BRILLIANT

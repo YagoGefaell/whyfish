@@ -102,3 +102,49 @@ class Voice:
 
     def say(self, you: str, they: str) -> str:
         return you if self.you else they.replace("{Subj}", self.subject)
+
+
+_NUMBERS = {2: "dos", 3: "tres", 4: "cuatro", 5: "cinco", 6: "seis", 7: "siete", 8: "ocho"}
+
+
+def pieces(names: tuple[str, ...], definite: bool = True) -> str:
+    """'la dama', 'dos peones', 'la torre y un peón', 'un caballo' (definite=False).
+
+    Names are English piece names ("queen", "pawn"...), biggest first. Pawns always take the
+    indefinite article ("un peón") or a number ("dos peones").
+    """
+    groups: list[tuple[str, int]] = []
+    for name in names:
+        if groups and groups[-1][0] == name:
+            groups[-1] = (name, groups[-1][1] + 1)
+        else:
+            groups.append((name, 1))
+    parts: list[str] = []
+    for name, count in groups:
+        noun, gender = _PIECES[name]
+        if count > 1:
+            plural = noun.replace("ó", "o") + ("es" if noun.endswith(("n", "l")) else "s")
+            parts.append(f"{_NUMBERS.get(count, str(count))} {plural}")
+        elif definite and name != "pawn":
+            parts.append(f"{'la' if gender == 'f' else 'el'} {noun}")
+        else:
+            parts.append(f"{'una' if gender == 'f' else 'un'} {noun}")
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + " y " + parts[-1]
+
+
+def exchange(lost: tuple[str, ...], won: tuple[str, ...]) -> str:
+    """What one side gives for what: 'la dama a cambio de un caballo', 'un peón'."""
+    if not won:
+        return pieces(lost)
+    return f"{pieces(lost)} a cambio de {pieces(won, definite=False)}"
+
+
+def more(points: int) -> str:
+    """Extra material: 'un peón más', 'dos peones más', 'más material (lo que vale una torre)'."""
+    if points <= 1:
+        return "un peón más"
+    if points == 2:
+        return "dos peones más"
+    return "más " + material(points)

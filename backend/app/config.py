@@ -135,10 +135,15 @@ class ClassificationThresholds:
     # ...or falls into another outcome category (winning > winning_above, losing < losing_below).
     winning_above: float = 75.0
     losing_below: float = 25.0
+    # Never great when the position was already this good (keeping a won game is not notable).
+    great_max_win_before: float = 85.0
     # Brilliant (!!).
     brilliant_max_delta: float = 2.0
     brilliant_max_win_before: float = 90.0  # exclusive: not already totally winning
     brilliant_min_win_after: float = 45.0
+    # No brilliant when the mover was already down material (resolved) before the move: it is
+    # the continuation of an own combination, not a new sacrifice.
+    brilliant_min_material_before: int = 0
     sacrifice_min_material: int = 2  # points (P=1, N=B=3, R=5, Q=9)
     sacrifice_horizon_plies: int = 6
     # Quiescence depth (captures, promotions and check evasions) used to resolve pending
@@ -163,10 +168,6 @@ THRESHOLDS = ClassificationThresholds()
 class FactThresholds:
     # Smallest material swing (P=1, N=B=3, R=5, Q=9) the explanations talk about.
     material_min: int = 1
-    # Plies of an engine line followed to count material; captures extend it (an exchange in
-    # progress is finished) by up to `line_exchange_extension` plies, then SEE settles the rest.
-    line_plies: int = 6
-    line_exchange_extension: int = 4
     # Motifs (fork, pin, ...) are looked for in the first plies of a line only.
     motif_plies: int = 4
     # "Wins material" is only said if the line shows a capture of ours and the mover's win% in
@@ -183,6 +184,13 @@ class FactThresholds:
     annotations_level2_max: int = 6
     # Plies of a commented line in level 2.
     commented_line_plies: int = 6
+    # Consequence point (SPEC §5.3): lines are followed at most this many plies, and the
+    # quiescence that decides whether a position is quiet goes this deep.
+    consequence_max_plies: int = 20
+    quiescence_max_plies: int = 8
+    # A gain or loss is stated in the level-1 text only if its consequence point is within
+    # this many plies of the line: the same limit as "Ver por qué", which replays up to it.
+    consequence_text_max_plies: int = 20
 
 
 FACTS = FactThresholds()

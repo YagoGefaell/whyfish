@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import chess
 
-from app.analysis import material
+from app.analysis.consequence import Consequence, consequence
 from app.analysis.detectors.common import PieceOn, require_piece
 from app.analysis.detectors.motifs import Motif, motifs_in_line
 from app.analysis.winprob import win_percent
@@ -26,15 +26,14 @@ class LineOutcome:
     base_ply: int  # game position the line starts from (= ply of the move it begins with)
     ucis: tuple[str, ...]
     sans: tuple[str, ...]
-    # Net material change for the mover at the end of the counted plies, settled with SEE.
+    # Mover's material change at the consequence point of the line (SPEC §5.3): resolved,
+    # never in the middle of an exchange.
     material: int
-    # Part of `material` that comes from the final SEE settlement (a capture still pending at
-    # the end of the line), not from moves of the line.
-    settled: int
+    consequence: Consequence
     # Mover's point of view: > 0 the mover mates in N moves, < 0 the mover is mated in N.
     mate: int | None
     win: float  # mover's win% for this line
-    captures: tuple[Capture, ...]
+    captures: tuple[Capture, ...]  # up to the consequence point (the whole line if none)
     motifs: tuple[Motif, ...]
     promotion: int | None  # ply of the first promotion, if any
 
@@ -59,15 +58,13 @@ def line_outcome(
     t: FactThresholds = FACTS,
 ) -> LineOutcome:
     """`cp` / `mate` are the engine score of the line for the side to move in `board`."""
-    mover = board.turn
+    cons = consequence(board, ucis, t)
     b = board.copy(stack=False)
-    start = material.balance(b, mover)
     sans: list[str] = []
     valid: list[str] = []
     captures: list[Capture] = []
     promotion: int | None = None
-    counted_end: chess.Board | None = None
-    limit = t.line_plies + t.line_exchange_extension
+    window = cons.ply + 1 if cons.ply is not None else t.consequence_max_plies
     for index, uci in enumerate(ucis):
         try:
             move = chess.Move.from_uci(uci)
@@ -75,11 +72,7 @@ def line_outcome(
             break
         if move not in b.legal_moves:
             break
-        counting = counted_end is None
-        if counting and index >= t.line_plies and (index >= limit or not b.is_capture(move)):
-            counted_end = b.copy(stack=False)
-            counting = False
-        if counting:
+        if index < window:
             if b.is_capture(move):
                 victim = (
                     move.to_square
@@ -96,21 +89,14 @@ def line_outcome(
         sans.append(b.san(move))
         valid.append(uci)
         b.push(move)
-    end = counted_end or b
-    net = material.balance(end, mover) - start
-    settled = 0
-    if not end.is_game_over():
-        settle = max((material.see(end, s) for s in end.piece_map()), default=0)
-        settled = settle if end.turn == mover else -settle
-        net += settled
     win = win_percent(cp, mate) if (cp is not None or mate is not None) else 50.0
     return LineOutcome(
         name=name,
         base_ply=base_ply,
         ucis=tuple(valid),
         sans=tuple(sans),
-        material=net,
-        settled=settled,
+        material=cons.material,
+        consequence=cons,
         mate=mate,
         win=win,
         captures=tuple(captures),

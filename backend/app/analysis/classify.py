@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import chess
 
+from app.analysis import material
 from app.analysis.sacrifice import find_sacrifice
 from app.analysis.types import Classification, PositionEval
 from app.analysis.winprob import line_win, move_accuracy, position_win
@@ -78,11 +79,19 @@ def _classification(
         and delta < t.brilliant_max_delta
         and wb < t.brilliant_max_win_before
         and wa >= t.brilliant_min_win_after
+        and not_behind(inp.board, t)
         and is_sacrifice(inp, t)
     ):
         return C.BRILLIANT
     best = is_best(inp)
-    if best and special and not gives_mate(inp.board, inp.move) and is_great(inp.before, t):
+    if (
+        best
+        and special
+        and wb < t.great_max_win_before
+        and not gives_mate(inp.board, inp.move)
+        and not takes_free_material(inp.board, inp.move)
+        and is_great(inp.before, t)
+    ):
         return C.GREAT
     if best or delta <= t.best_max_delta:
         return C.BEST
@@ -95,6 +104,22 @@ def _classification(
     if delta < t.mistake:
         return C.MISTAKE
     return C.BLUNDER
+
+
+def not_behind(board: chess.Board, t: ClassificationThresholds) -> bool:
+    """The mover is not already down material (pending exchanges resolved)."""
+    resolved = material.resolved_balance(board, board.turn, t.quiescence_max_plies)
+    return resolved >= t.brilliant_min_material_before
+
+
+def takes_free_material(board: chess.Board, move: chess.Move) -> bool:
+    """The move captures something the opponent left en prise: it wins material even after the
+    opponent's best recapture sequence (SEE). Punishing an obvious error is not great (★)."""
+    if not board.is_capture(move):
+        return False
+    after = board.copy(stack=False)
+    after.push(move)
+    return material.captured_value(board, move) - material.see(after, move.to_square) >= 1
 
 
 def is_best(inp: MoveInput) -> bool:

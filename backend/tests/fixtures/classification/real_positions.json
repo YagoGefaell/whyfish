@@ -41,13 +41,13 @@
       "id": "opera-16-qb8",
       "pgn": "morphy_opera_1858.pgn",
       "ply": 30,
-      "expected": "great",
+      "expected": "best",
       "source": {
         "game": "Paul Morphy - Duke Karl / Count Isouard, Paris (Opera)",
         "year": 1858,
         "move": "16.Qb8+"
       },
-      "note": "Queen sacrifice traditionally annotated !!, but white is already totally winning (SPEC 3.1 rule 3: win% before < 90), so ! (only move that mates)."
+      "note": "Queen sacrifice traditionally annotated !!, but white is already totally winning (win% 100): not !! (SPEC 3.1 rule 3) and, since 2026-11-26, not ! either (win% before >= 85, SPEC 3.2): best."
     },
     {
       "id": "opera-17-rd8",

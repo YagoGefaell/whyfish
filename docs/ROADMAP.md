@@ -48,23 +48,39 @@ Cada fase termina con algo usable y comprobable. No empezar una fase sin cerrar 
 - **Aceptación:** cada jugada clasificada como ?!, ?, ??, ! o !! tiene explicación de nivel 1
   coherente sin LLM; revisión manual de 20 jugadas de fixtures sin afirmaciones falsas.
 
-## Fase 5 — Explicaciones con LLM
-- `LLMProvider` + Anthropic/OpenAI/Ollama, prompts versionados, jugadas marcadas `[[SAN]]` validadas contra los hechos,
-  reintento, caché.
-- **Aceptación:** cambiar `LLM_PROVIDER` en `.env` cambia el proveedor sin tocar código; un test
-  con un proveedor fake que inventa una jugada demuestra que se detecta y se degrada a plantilla.
+## Fase 5 — "Ver por qué"
+Que el usuario **vea** la secuencia entera que lleva a la consecuencia de una jugada (SPEC §5.4).
+- Botón "Ver por qué" en toda jugada que no sea la mejor (excelente, buena, ?!, ?, ??, ✗):
+  reproduce la refutación del motor tras la jugada hecha. "Ver la idea" en !, !! y ★ con
+  explicación: reproduce la línea de la mejor jugada.
+- La secuencia llega **hasta el punto de consecuencia** (material perdido o ganado con los
+  cambios resueltos, mate, coronación, pieza atrapada), nunca a mitad de un intercambio. Si la
+  línea en caché es corta, se extiende con el motor (pool de análisis, tiempo corto) y se
+  cachea. Límite de seguridad configurable (p. ej. 20 plies); si no hay consecuencia clara, se
+  reproduce hasta que la evaluación se estabiliza y el texto lo dice con prudencia.
+- Reproducción automática (~1 s por jugada, configurable) con pausa, ◀ ▶ y "Volver a la
+  partida" (Esc); piezas que se deslizan, origen y destino resaltados, una frase por paso
+  generada desde los hechos, flechas de amenazas que se ejecutan después, y el paso de la
+  consecuencia destacado (rojo en errores, verde en jugadas buenas).
+- Tarjeta final con el balance ("Pierdes la dama por un caballo", "Mate en 4"), "Repetir" y
+  "Volver a la partida". La secuencia también como texto numerado con jugadas clicables.
+- "Pruébalo tú" en ?!, ?, ?? y ✗: repetir la posición anterior y buscar la mejor; si acierta se
+  felicita, si no se ofrece "Ver por qué" de su intento (endpoint de evaluación) o la solución.
+  Con "Pruébalo tú" activo, la flecha de la mejor jugada se oculta.
+- Backend: función pura de punto de consecuencia + frases por paso + resumen (tests con FEN
+  fijos); `GET /api/games/{id}/moves/{ply}/why?kind=refutation|idea` →
+  `{steps: [{san, uci, fen, caption, annotations}], consequence_ply, summary}`; extensión de la
+  línea con el motor, cacheada.
+- **Aceptación:** un fixture donde la jugada pierde la dama 3 jugadas después reproduce las 6+
+  plies hasta la captura y la recaptura, con el resumen correcto; e2e con captura en mitad de la
+  reproducción y en la tarjeta final, en escritorio y móvil.
 
-## Fase 6 — Coach interactivo
-- Chat por jugada con herramientas (SPEC §5.1 nivel 3), streaming, historial.
-- Modo "Pruébalo tú" en errores.
-- **Aceptación:** pregunto "¿y si juego X?" y la respuesta usa la evaluación real de X.
-
-## Fase 7 — Aprendizaje a largo plazo (opcional)
+## Fase 6 — Aprendizaje a largo plazo (opcional)
 - Importar partidas desde Lichess/Chess.com.
 - Estadísticas por patrón (tipo de error, fase, motivo táctico), aperturas problemáticas.
 - Ejercicios generados a partir de los propios errores (repetición espaciada).
 
-## Fase 8 — Despliegue en Raspberry Pi (opcional)
+## Fase 7 — Despliegue en Raspberry Pi (opcional)
 - Imagen Docker para ARM64 (o multi-arch) con frontend compilado servido por el backend.
 - `compose.yaml` con `restart: unless-stopped` y volumen para la base SQLite.
 - Stockfish para ARM (build oficial `linux-arm64`) dentro de la imagen.
@@ -72,3 +88,13 @@ Cada fase termina con algo usable y comprobable. No empezar una fase sin cerrar 
 - Acceso en la LAN; Tailscale opcional para acceder desde fuera. Sin exposición pública a internet.
 - **Aceptación:** la app arranca sola en la Pi tras reiniciarla y es accesible desde otro
   dispositivo de la red.
+
+## Ideas futuras (descartadas por ahora)
+Las explicaciones son siempre por plantilla. Se conservan las marcas `[[SAN]]` y su validador
+por si se retoma una IA.
+- **Explicaciones con LLM** (antigua Fase 5): `LLMProvider` + Anthropic/OpenAI/Ollama, prompts
+  versionados, marcas `[[SAN]]` validadas contra los hechos, reintento y degradación a
+  plantilla, caché.
+- **Coach interactivo** (antigua Fase 6): chat por jugada con herramientas
+  (`evaluate_position`, `analyze_move`, `get_threats`, `legal_moves`), streaming, historial;
+  "¿y si juego X?" respondido con la evaluación real de X.
