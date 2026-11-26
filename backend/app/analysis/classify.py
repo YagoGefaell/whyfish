@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import chess
 
-from app.analysis import material
+from app.analysis.sacrifice import find_sacrifice
 from app.analysis.types import Classification, PositionEval
 from app.analysis.winprob import line_win, move_accuracy, position_win
 from app.config import THRESHOLDS, ClassificationThresholds
@@ -141,41 +141,14 @@ def is_great(before: PositionEval, t: ClassificationThresholds) -> bool:
 
 
 def is_sacrifice(inp: MoveInput, t: ClassificationThresholds) -> bool:
-    """SPEC §3.1.2: material drops along the line, or a piece of ours is newly en prise."""
-    if material.left_en_prise(inp.board, inp.move, t.sacrifice_min_material):
-        return True
-    line = _played_line(inp)
-    return _material_drop(inp.board, line, t.sacrifice_horizon_plies) >= t.sacrifice_min_material
+    """SPEC §3.1.2: see `app.analysis.sacrifice`."""
+    return find_sacrifice(inp.board, inp.move, played_line(inp), t) is not None
 
 
-def _played_line(inp: MoveInput) -> tuple[str, ...]:
+def played_line(inp: MoveInput) -> tuple[str, ...]:
     uci = inp.move.uci()
     for line in inp.before.lines:
         if line.move == uci:
             return line.moves
     reply = inp.after.lines[0].moves if inp.after.lines else ()
     return (uci, *reply)
-
-
-# Keep following a capture sequence this many plies past the horizon so the count does not
-# stop in the middle of an exchange.
-_EXCHANGE_EXTENSION = 4
-
-
-def _material_drop(board: chess.Board, line: tuple[str, ...], horizon: int) -> int:
-    """How much material the side to move in `board` is down after `horizon` plies of `line`."""
-    mover = board.turn
-    b = board.copy(stack=False)
-    start = material.balance(b, mover)
-    limit = horizon + _EXCHANGE_EXTENSION
-    for i, uci in enumerate(line):
-        if i >= horizon:
-            if i >= limit:
-                break
-            if not b.is_capture(chess.Move.from_uci(uci)):
-                break
-        try:
-            b.push_uci(uci)
-        except ValueError:
-            break
-    return start - material.balance(b, mover)

@@ -194,6 +194,34 @@ def recapture() -> MoveFacts:
     )
 
 
+KNIGHT_SAC = "6k1/5p1p/6p1/8/3N4/8/5PPP/6K1 w - - 0 1"
+
+
+def knight_sacrifice() -> MoveFacts:
+    """Nf5!! leaves the knight to the g6 pawn; the position stays balanced."""
+    return make_facts(
+        KNIGHT_SAC,
+        "d4f5",
+        [line("d4f5", "g6f5", cp=-20), line("d4e2", cp=-40)],
+        [line("g6f5", cp=20)],
+        C.BRILLIANT,
+    )
+
+
+BD2_IN_CHECK = "rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8"
+
+
+def forced_loss_labelled_brilliant() -> MoveFacts:
+    """8.Bd2 in check, with the old wrong !! label: no legal move saved the g6 bishop."""
+    return make_facts(
+        BD2_IN_CHECK,
+        "c1d2",
+        [line("c1d2", "h7g6", "d2b4", "d5b4", "d1b3", "c7c5", cp=128), line("b1c3", cp=55)],
+        [line("h7g6", "d2b4", cp=-128)],
+        C.BRILLIANT,
+    )
+
+
 ALL = [
     fools_mate_g4,
     fools_mate_missed,
@@ -206,4 +234,6 @@ ALL = [
     book_e4,
     good_a3,
     recapture,
+    knight_sacrifice,
+    forced_loss_labelled_brilliant,
 ]

@@ -27,6 +27,7 @@ from app.analysis.facts import MoveEffects, MoveFacts
 from app.analysis.positions import game_positions
 from app.analysis.review import build_review
 from app.analysis.runner import lines_from_json
+from app.analysis.sacrifice import Sacrifice
 from app.analysis.types import Classification, PositionEval
 from app.config import get_settings
 from app.db import make_db_engine
@@ -298,6 +299,7 @@ def _facts_table(item: Item) -> str:
         ("played_line", _line(f.played_line)),
         ("best_line", "(es la jugada hecha)" if f.is_best else _line(f.best_line)),
         ("second_line", _line(f.second_line) if f.second_line else ""),
+        ("sacrifice", _sacrifice(f.sacrifice)),
         *_effects_rows("played", f.played),
         *_effects_rows("best", f.best),
     ]
@@ -315,6 +317,15 @@ def _facts_table(item: Item) -> str:
             f"<tr{cls}><td>{mark}</td><td><code>{key}</code></td><td>{html.escape(value)}</td></tr>"
         )
     return '<table class="facts">' + "".join(out) + "</table>"
+
+
+def _sacrifice(s: Sacrifice | None) -> str:
+    if s is None:
+        return ""
+    return (
+        f"entrega {s.amount} (material resuelto: referencia {s.reference:+d}, "
+        f"tras la jugada {s.after_move:+d}, al final de la línea {s.line_end:+d})"
+    )
 
 
 def _diagnosis(item: Item) -> str:

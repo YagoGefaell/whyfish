@@ -256,10 +256,13 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - Nivel **"Personalizado"** con selector de Elo (1320–3190, rango de `UCI_Elo` en Stockfish 19).
 
 ## Deuda técnica / dudas abiertas
-- **Brillante falso (Fase 2), visto en el informe:** 5… Bd6 de la partida 1 sale como !! porque
-  la variante principal del motor solo tiene 2 medias jugadas (Bd6 Bxd6) y `_material_drop` de
-  `classify.py` no cierra el intercambio pendiente con SEE (Qxd6). Propuesta: cerrar con SEE como
-  hace `detectors/lines.py`. Pendiente de decisión del usuario (cambia la clasificación).
+- **Corregido (2026-11-26): brillantes falsos.** 8.Bd2 en jaque (partida 6) y 5… Bd6 (partida 1)
+  salían !!. El sacrificio se mide ahora con material resuelto por quiescencia y exige una
+  alternativa que conserve el material (`app/analysis/sacrifice.py`, SPEC §3.1). Las !! que quedan
+  en el fixture de Kasparov (25.Re7+, 26.Qxd4+, 28.Qc3, 29.Ra7, 30.Rxb7, 36.Bf1, 37.Rd7) y en
+  Fischer (14…Qb6, 15…Nxc3) son piezas realmente ofrecidas dentro de la combinación, pero la
+  tradición solo da !! a 24.Rxd4 y 17…Be6/11…Na4. Pendiente de decisión del usuario: ¿limitar a
+  una !! por combinación (p. ej. no repetir si la jugada anterior propia ya fue !!)?
 - Explicaciones genéricas en ?! posicionales sin hechos (el informe las marca "faltan hechos").
 - Desviación, sobrecarga y rayos X sin detectar (SPEC §4).
 - Elo de Principiante/Novato aproximado y sin calibrar.

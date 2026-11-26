@@ -168,6 +168,18 @@
         "move": "2...d5"
       },
       "note": "After 2.g4?? black misses Qh4#."
+    },
+    {
+      "id": "whyfish-8-bd2",
+      "pgn": "whyfish_bd2_in_check.pgn",
+      "ply": 14,
+      "expected": "best",
+      "source": {
+        "game": "User vs Stockfish Novato (whyfish)",
+        "year": 2026,
+        "move": "8.Bd2"
+      },
+      "note": "Regression: 7.Bxg6 starts an exchange, 7...Bb4+ is an in-between check and 8...hxg6 restores material balance. No legal move saves the g6 bishop, so 8.Bd2 is not a sacrifice (was wrongly !!). Best move; the second option (Nc3) is less than 10 points worse, so not !."
     }
   ]
 }

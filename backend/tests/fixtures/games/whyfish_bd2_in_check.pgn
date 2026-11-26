@@ -1,0 +1,6 @@
+[Event "Regression fixture: user game vs Stockfish Novato (8.Bd2 is not a sacrifice)"]
+[White "User"]
+[Black "Stockfish Novato"]
+[Result "*"]
+
+1. e3 d5 2. d4 Nf6 3. Nf3 Bf5 4. c4 e6 5. cxd5 Nxd5 6. Bd3 Bg6 7. Bxg6 Bb4+ 8. Bd2 hxg6 *

@@ -5,7 +5,6 @@ import pytest
 
 from app.analysis.classify import (
     MoveInput,
-    _material_drop,
     classify,
     is_obvious_recapture,
     is_sacrifice,
@@ -176,11 +175,15 @@ class TestBrilliant:
         assert not is_sacrifice(move, THRESHOLDS)
 
 
-def test_material_drop_follows_the_exchange_past_the_horizon() -> None:
-    board = chess.Board("3rk3/8/8/3p4/8/8/8/3QK3 w - - 0 1")
-    # Qxd5 Rxd5: +1 then -9. With horizon 1 the recapture is still counted.
-    assert _material_drop(board, ("d1d5", "d8d5"), horizon=1) == 8
-    assert _material_drop(board, ("d1d5", "d8d5", "e1e2"), horizon=6) == 8
+# 7...Bb4+ in the middle of the exchange started by 7.Bxg6: white is in check and the g6
+# bishop is lost whatever white plays (regression: 8.Bd2 was classified as brilliant).
+IN_CHECK_MID_EXCHANGE = "rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8"
+
+
+def test_forced_loss_in_check_is_not_brilliant() -> None:
+    line = "c1d2 h7g6 d2b4 d5b4 d1b3 c7c5"
+    verdict = classify(inp(IN_CHECK_MID_EXCHANGE, "c1d2", ev((line, 128), ("b1c3", 55))))
+    assert verdict.classification is C.BEST
 
 
 def test_obvious_recapture_detection() -> None:

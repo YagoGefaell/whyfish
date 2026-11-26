@@ -141,6 +141,9 @@ class ClassificationThresholds:
     brilliant_min_win_after: float = 45.0
     sacrifice_min_material: int = 2  # points (P=1, N=B=3, R=5, Q=9)
     sacrifice_horizon_plies: int = 6
+    # Quiescence depth (captures, promotions and check evasions) used to resolve pending
+    # exchanges when measuring material for sacrifices.
+    quiescence_max_plies: int = 8
     # Missed opportunity: after an opponent's ? / ??, Δ >= this and the best move reached
     # at least `missed_decisive_win`.
     missed_min_delta: float = 10.0

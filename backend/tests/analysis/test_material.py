@@ -60,6 +60,11 @@ class TestLeftEnPrise:
         assert material.see(_flip(board), chess.A7) == 3  # en prise before the move
         assert material.left_en_prise(board, chess.Move.from_uci("e1d2"), 2) == []
 
+    def test_piece_lost_anyway_while_in_check_does_not_count(self) -> None:
+        # 7...Bb4+: no check evasion also saves the g6 bishop (it was en prise before).
+        board = chess.Board("rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8")
+        assert material.left_en_prise(board, chess.Move.from_uci("c1d2"), 2) == []
+
 
 def _flip(board: chess.Board) -> chess.Board:
     flipped = board.copy(stack=False)

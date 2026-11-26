@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Literal
 
 import pytest
 
@@ -27,7 +28,21 @@ LEVEL1 = {
     s.takes_knight: "[[Qxd5]] captura el caballo de d5, que estaba sin defensa suficiente.",
     s.book_e4: "Jugada de teoría: King's Pawn Game.",
     s.good_a3: "Buena jugada, aunque [[Nf3]] era algo más precisa: desarrollaba un caballo.",
+    s.knight_sacrifice: (
+        "[[Nf5]] entrega el caballo de f5: si [[gxf5]] lo captura, la posición se mantiene "
+        "equilibrada pese al material de menos."
+    ),
 }
+
+
+@pytest.mark.parametrize("level", [1, 2])
+def test_no_sacrifice_wording_without_a_resolved_sacrifice(level: Literal[1, 2]) -> None:
+    """Even with a (wrong) !! label, the text cannot claim a sacrifice the facts do not show."""
+    facts = s.forced_loss_labelled_brilliant()
+    assert facts.sacrifice is None
+    text = (explain(facts, level, you=True).text or "").lower()
+    for word in ("entrega", "sacrific", "material de menos"):
+        assert word not in text
 
 
 @pytest.mark.parametrize("scenario", list(LEVEL1), ids=lambda f: f.__name__)

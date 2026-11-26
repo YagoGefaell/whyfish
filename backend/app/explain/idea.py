@@ -25,7 +25,7 @@ from app.analysis.detectors.motifs import Motif
 from app.analysis.detectors.threats import Parried, Threat
 from app.analysis.facts import MoveFacts
 from app.analysis.types import Classification
-from app.config import FACTS, FactThresholds
+from app.config import FACTS, THRESHOLDS, FactThresholds
 
 C = Classification
 ERRORS = (C.INACCURACY, C.MISTAKE, C.BLUNDER, C.MISS)
@@ -406,17 +406,32 @@ def _only_move(facts: MoveFacts, t: FactThresholds) -> Idea | None:
 
 
 def _sacrifice(facts: MoveFacts, t: FactThresholds) -> Idea | None:
-    pl = facts.played_line
-    if pl is None:
+    """Only from `facts.sacrifice` (resolved material, some other move kept it).
+
+    The piece is named only when the facts show it: the opponent captures it right away in
+    the line (`index`), or it is left en prise and that alone accounts for the sacrifice.
+    Otherwise (the material goes later in the line) no piece is named.
+    """
+    pl, sac = facts.played_line, facts.sacrifice
+    if pl is None or sac is None:
         return None
-    piece = facts.played.hanging[0].piece if facts.played.hanging else facts.played.piece
-    index = next(
-        (c.index for c in pl.captures if c.index == 1 and c.captured.square == piece.square), None
-    )
-    anns: list[Annotation] = [square(piece.square, "danger")]
+    minimum = THRESHOLDS.sacrifice_min_material
+    used = ["sacrifice", "played_line"]
+    piece: PieceOn | None = None
+    index: int | None = None
+    first = next((c for c in pl.captures if c.index == 1), None)
+    if first is not None and first.captured.value >= minimum:
+        piece, index = first.captured, 1
+    elif facts.played.hanging:
+        top = facts.played.hanging[0]
+        if top.loss >= minimum and sac.after_move <= -minimum:
+            piece = top.piece
+            used.append("played.hanging")
+    anns: list[Annotation] = [square(piece.square, "danger")] if piece else []
     anns += [arrow(th.attackers[0], th.target.square, "attack") for th in facts.played.threats[:2]]
-    used = ["played.hanging" if facts.played.hanging else "played_line.material", "played_line"]
-    return Idea(IdeaKind.SACRIFICE, tuple(used), tuple(anns), piece=piece, index=index)
+    return Idea(
+        IdeaKind.SACRIFICE, tuple(used), tuple(anns), piece=piece, index=index, gain=sac.amount
+    )
 
 
 def _wins_material(facts: MoveFacts, t: FactThresholds) -> Idea | None:

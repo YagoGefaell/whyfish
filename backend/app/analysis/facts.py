@@ -30,6 +30,7 @@ from app.analysis.detectors.threats import (
     new_threats,
     parried_threats,
 )
+from app.analysis.sacrifice import Sacrifice, find_sacrifice
 from app.analysis.types import Classification, PositionEval
 from app.config import FACTS, FactThresholds
 
@@ -79,6 +80,10 @@ class MoveFacts:
     played_line: LineOutcome | None  # the played move, then the opponent's best reply...
     best_line: LineOutcome | None
     second_line: LineOutcome | None  # when the played move is the best: the next option
+    # Material given up for nothing forced, measured with resolved exchanges (the same check
+    # as the brilliant classification). Templates may only say "entrega" / "material de menos"
+    # from this.
+    sacrifice: Sacrifice | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -172,6 +177,7 @@ def build_move_facts(
         if best_move in board.legal_moves:
             best_effects = move_effects(board, best_move, t)
 
+    played_line = _played_line(board, move, before, after, ply, t)
     return MoveFacts(
         ply=ply,
         color="white" if board.turn == chess.WHITE else "black",
@@ -192,7 +198,8 @@ def build_move_facts(
         after_opponent_error=after_opponent_error,
         played=move_effects(board, move, t),
         best=best_effects,
-        played_line=_played_line(board, move, before, after, ply, t),
+        played_line=played_line,
         best_line=best_line,
         second_line=second_line,
+        sacrifice=find_sacrifice(board, move, played_line.ucis),
     )

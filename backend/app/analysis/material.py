@@ -92,8 +92,9 @@ def left_en_prise(
 
 
 def _was_en_prise(before: chess.Board, square: chess.Square, min_gain: int) -> bool:
-    if before.is_check():
-        return False  # a null move is not meaningful here; treat as not en prise before
+    # Also when the mover is in check: the null move only hands the turn over, which is what
+    # "could the opponent take it if it were their move" means (a piece attacked while we are
+    # in check is usually lost; `_could_be_saved` then decides).
     flipped = before.copy(stack=False)
     flipped.push(chess.Move.null())
     return see(flipped, square) >= min_gain
@@ -121,3 +122,61 @@ def _could_be_saved(
         if see(b, target) - taken < min_gain:
             return True
     return False
+
+
+_INFINITY = 10_000
+
+
+def resolved_balance(board: chess.Board, color: chess.Color, max_plies: int) -> int:
+    """Balance of `color` once the pending captures are played out (quiescence search).
+
+    The side to move may stand pat (keep the static balance) unless it is in check, in which
+    case every evasion is searched. Captures and promotions only, at most `max_plies` deep.
+    Mate is not scored: this is a material measure.
+    """
+    value = _quiescence(board.copy(stack=False), max_plies, -_INFINITY, _INFINITY)
+    return value if board.turn == color else -value
+
+
+def balance_after(board: chess.Board, move: chess.Move, color: chess.Color, max_plies: int) -> int:
+    """`resolved_balance` of `color` after `move` (the opponent then resolves the captures)."""
+    after = board.copy(stack=False)
+    after.push(move)
+    return resolved_balance(after, color, max_plies)
+
+
+def _quiescence(board: chess.Board, depth: int, alpha: int, beta: int) -> int:
+    """Negamax value (material, side to move's point of view) with alpha-beta."""
+    static = balance(board, board.turn)
+    in_check = board.is_check()
+    if depth == 0:
+        return static
+    if in_check:
+        moves = list(board.legal_moves)
+        if not moves:
+            return static
+    else:
+        if static >= beta:
+            return static
+        alpha = max(alpha, static)
+        moves = [m for m in board.legal_moves if board.is_capture(m) or m.promotion]
+    moves.sort(key=lambda m: _capture_order(board, m), reverse=True)
+    best = static if not in_check else -_INFINITY
+    for move in moves:
+        board.push(move)
+        value = -_quiescence(board, depth - 1, -beta, -alpha)
+        board.pop()
+        if value > best:
+            best = value
+        if value > alpha:
+            alpha = value
+        if alpha >= beta:
+            break
+    return best
+
+
+def _capture_order(board: chess.Board, move: chess.Move) -> tuple[int, int]:
+    """Most valuable victim first, then least valuable attacker."""
+    attacker = board.piece_at(move.from_square)
+    attacker_value = PIECE_VALUES[attacker.piece_type] if attacker else 0
+    return captured_value(board, move) + (PIECE_VALUES.get(move.promotion or 0, 0)), -attacker_value
