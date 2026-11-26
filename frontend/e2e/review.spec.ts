@@ -60,6 +60,16 @@ test('import, analyse and review a game', async ({ page }, testInfo) => {
   await expect(page.getByTestId('move-badge')).toBeVisible()
   await shot(page, 'review-error', project)
 
+  // The explanation (template, no LLM): text with clickable moves; "Profundizar" = level 2.
+  const explanation = panel.getByLabel('Explicación')
+  await expect(explanation.getByRole('button').first()).toBeVisible()
+  await panel.getByRole('button', { name: 'Profundizar' }).click()
+  await expect(panel.getByLabel('Explicación')).toContainText(
+    /Lo que pasa tras la jugada|Con la mejor/,
+  )
+  await shot(page, 'review-explanation', project)
+  await panel.getByRole('button', { name: 'Menos detalle' }).click()
+
   // Not the best move: "La mejor era X" (+ green arrow) appears on its own; "Ver línea" unfolds it.
   await expect(panel.getByText(/La mejor era/)).toBeVisible()
   await panel.getByRole('button', { name: 'Ver línea' }).click()

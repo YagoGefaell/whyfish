@@ -151,3 +151,35 @@ class ClassificationThresholds:
 
 
 THRESHOLDS = ClassificationThresholds()
+
+
+# --- Facts and explanations (SPEC §4-5) ----------------------------------------
+
+
+@dataclass(frozen=True)
+class FactThresholds:
+    # Smallest material swing (P=1, N=B=3, R=5, Q=9) the explanations talk about.
+    material_min: int = 1
+    # Plies of an engine line followed to count material; captures extend it (an exchange in
+    # progress is finished) by up to `line_exchange_extension` plies, then SEE settles the rest.
+    line_plies: int = 6
+    line_exchange_extension: int = 4
+    # Motifs (fork, pin, ...) are looked for in the first plies of a line only.
+    motif_plies: int = 4
+    # "Wins material" is only said if the line shows a capture of ours and the mover's win% in
+    # that line is at least this (otherwise the "gain" is an opponent's sacrifice in progress).
+    gain_claim_min_win: float = 55.0
+    # Phase: opening up to this full move; endgame when the non-pawn material of both sides
+    # together (kings excluded) is at most this many points.
+    opening_max_fullmove: int = 10
+    endgame_max_material: int = 16
+    # "Mate in N" is spelled out (with its moves) up to this N; beyond that, "un ataque de mate".
+    mate_spell_max: int = 3
+    # Annotations drawn on the board: level 1 (main idea only) and level 2.
+    annotations_level1_max: int = 3
+    annotations_level2_max: int = 6
+    # Plies of a commented line in level 2.
+    commented_line_plies: int = 6
+
+
+FACTS = FactThresholds()

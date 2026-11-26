@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 import chess
 import chess.engine
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 
@@ -15,14 +15,17 @@ from app.analysis.runner import (
     AnalysisNotReadyError,
     AnalysisService,
 )
-from app.analysis.types import SYMBOLS, Classification
+from app.analysis.types import SYMBOLS, Classification, PositionEval
 from app.api.deps import get_game_repository, get_settings_dep
 from app.config import Settings
 from app.engine.pool import PoolManager
 from app.engine.stockfish import EngineUnavailableError
+from app.explain.idea import Annotation
+from app.explain.marks import MoveRef
+from app.explain.service import Explanation, explain, facts_for_ply
 from app.models.analysis import AnalysisJob, AnalysisStatus
 from app.play.rules import PlayerColor
-from app.play.service import GameNotFoundError, GameRepository, GameRuleError
+from app.play.service import GameNotFoundError, GameRepository, GameRuleError, LoadedGame
 
 router = APIRouter()
 
@@ -269,8 +272,9 @@ async def stream_analysis(
         await service.wait_for_change(SSE_KEEPALIVE_S)
 
 
-@router.get("/games/{game_id}/review")
-def get_review(game_id: int, service: Analysis, repo: Repo) -> ReviewRead:
+def _reviewed(
+    game_id: int, service: AnalysisService, repo: GameRepository
+) -> tuple[LoadedGame, list[PositionEval], GameReview]:
     try:
         loaded = repo.load(game_id)
         _, evals = service.evaluations(game_id)
@@ -278,12 +282,87 @@ def get_review(game_id: int, service: Analysis, repo: Repo) -> ReviewRead:
         raise _not_found() from exc
     except AnalysisNotReadyError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    perspective = loaded.game.player_color
     review = build_review(
         loaded.game.initial_fen,
         [m.uci for m in loaded.moves],
         evals,
-        perspective=perspective.chess_color,
+        perspective=loaded.game.player_color.chess_color,
         book=default_book(),
     )
-    return ReviewRead.from_review(game_id, perspective, review)
+    return loaded, evals, review
+
+
+@router.get("/games/{game_id}/review")
+def get_review(game_id: int, service: Analysis, repo: Repo) -> ReviewRead:
+    loaded, _, review = _reviewed(game_id, service, repo)
+    return ReviewRead.from_review(game_id, loaded.game.player_color, review)
+
+
+class MoveRefRead(BaseModel):
+    """Where a [[SAN]] mark of the text is shown: `path` (UCI) played from position `base`."""
+
+    san: str
+    line: str
+    base: int
+    path: list[str]
+
+    @classmethod
+    def from_ref(cls, r: MoveRef) -> "MoveRefRead":
+        return cls(san=r.san, line=r.line, base=r.base_ply, path=list(r.path))
+
+
+class AnnotationRead(BaseModel):
+    """Drawn on the position after the move. threat/danger: red; attack/target: amber."""
+
+    kind: Literal["arrow", "square"]
+    role: Literal["threat", "danger", "attack", "target"]
+    square: str | None
+    from_square: str | None
+    to_square: str | None
+
+    @classmethod
+    def from_annotation(cls, a: Annotation) -> "AnnotationRead":
+        return cls(
+            kind=a.kind,
+            role=a.role,
+            square=a.square,
+            from_square=a.from_square,
+            to_square=a.to_square,
+        )
+
+
+class ExplanationRead(BaseModel):
+    ply: int
+    level: Literal[1, 2]
+    text: str | None  # moves marked as [[SAN]], one entry of `refs` per mark, in order
+    refs: list[MoveRefRead]
+    annotations: list[AnnotationRead]
+    idea: str | None
+
+    @classmethod
+    def from_explanation(cls, e: Explanation) -> "ExplanationRead":
+        return cls(
+            ply=e.ply,
+            level=e.level,
+            text=e.text,
+            refs=[MoveRefRead.from_ref(r) for r in e.refs],
+            annotations=[AnnotationRead.from_annotation(a) for a in e.annotations],
+            idea=e.idea,
+        )
+
+
+@router.get("/games/{game_id}/moves/{ply}/explanation")
+def get_explanation(
+    game_id: int,
+    ply: int,
+    service: Analysis,
+    repo: Repo,
+    level: Annotated[int, Query(ge=1, le=2)] = 1,
+) -> ExplanationRead:
+    loaded, evals, review = _reviewed(game_id, service, repo)
+    ucis = [m.uci for m in loaded.moves]
+    if not 0 <= ply < len(ucis):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Jugada no encontrada.")
+    facts = facts_for_ply(loaded.game.initial_fen, ucis, evals, review, ply, default_book())
+    you = review.moves[ply].color == loaded.game.player_color.chess_color
+    return ExplanationRead.from_explanation(explain(facts, 1 if level == 1 else 2, you))

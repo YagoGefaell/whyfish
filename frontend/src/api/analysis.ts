@@ -82,6 +82,33 @@ export interface Evaluation {
   white: WhiteEval
 }
 
+/** Where a [[SAN]] mark is shown: `path` (UCI) played from main-line position `base`. */
+export interface MoveRef {
+  san: string
+  line: 'played' | 'best' | 'second'
+  base: number
+  path: string[]
+}
+
+/** Drawn on the position after the move: threat/danger in red, attack/target in amber. */
+export interface Annotation {
+  kind: 'arrow' | 'square'
+  role: 'threat' | 'danger' | 'attack' | 'target'
+  square: string | null
+  from_square: string | null
+  to_square: string | null
+}
+
+export interface Explanation {
+  ply: number
+  level: 1 | 2
+  /** Moves marked as [[SAN]]; `refs` has one entry per mark, in order. null = nothing to say. */
+  text: string | null
+  refs: MoveRef[]
+  annotations: Annotation[]
+  idea: string | null
+}
+
 const post = <T>(path: string, body?: unknown, signal?: AbortSignal) =>
   request<T>(path, {
     method: 'POST',
@@ -94,6 +121,11 @@ export const analysisApi = {
   status: (gameId: number) => request<AnalysisJob>(`/games/${String(gameId)}/analysis`),
   review: (gameId: number) => request<Review>(`/games/${String(gameId)}/review`),
   streamUrl: (gameId: number) => `/api/games/${String(gameId)}/analysis/stream`,
+  explanation: (gameId: number, ply: number, level: 1 | 2, signal?: AbortSignal) =>
+    request<Explanation>(
+      `/games/${String(gameId)}/moves/${String(ply)}/explanation?level=${String(level)}`,
+      { signal },
+    ),
   evaluate: (fen: string, moves: string[], signal?: AbortSignal) =>
     post<Evaluation>('/analysis/evaluate', { fen, moves }, signal),
 }

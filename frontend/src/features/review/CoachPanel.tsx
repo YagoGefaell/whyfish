@@ -1,6 +1,6 @@
-import { ChevronDown, ListTree } from 'lucide-react'
+import { BookOpen, ChevronDown, ListTree } from 'lucide-react'
 import { useState } from 'react'
-import type { MoveReview, WhiteEval } from '../../api/analysis'
+import type { Explanation, MoveRef, MoveReview, WhiteEval } from '../../api/analysis'
 import { ClassBadge } from '../../components/ClassBadge'
 import { readFlag, writeFlag } from '../../lib/storage'
 import { CLASSIFICATIONS, evalLabel, moveNumber, showsAlternative } from './classification'
@@ -13,6 +13,13 @@ interface Props {
   evalAfter: WhiteEval | null
   /** Explore a line on the board: from the position before the move (best) or after it. */
   onLine: (from: 'before' | 'after', sans: string[], index: number) => void
+  /** Explanation at the level shown (level 2 when `deep`). */
+  explanation: Explanation | null
+  explanationLoading: boolean
+  deep: boolean
+  onDeep: (deep: boolean) => void
+  /** A move of the explanation was clicked: show it on the board. */
+  onRef: (ref: MoveRef) => void
 }
 
 /** SAN line with move numbers ("4… Nd7 5. exd6 Bxd6"); every move is clickable. */
@@ -53,7 +60,16 @@ function Line({
 }
 
 /** "Coach" card for the selected move: verdict, explanation, actions, engine details. */
-export function CoachPanel({ move, evalAfter, onLine }: Props) {
+export function CoachPanel({
+  move,
+  evalAfter,
+  onLine,
+  explanation,
+  explanationLoading,
+  deep,
+  onDeep,
+  onRef,
+}: Props) {
   const [detailsOpen, setDetailsOpen] = useState(() => readFlag(DETAILS_KEY, false))
   const [lineOpen, setLineOpen] = useState(false)
 
@@ -69,6 +85,7 @@ export function CoachPanel({ move, evalAfter, onLine }: Props) {
   }
   const meta = CLASSIFICATIONS[move.classification]
   const alternative = showsAlternative(move)
+  const canDeepen = deep || Boolean(explanation?.text)
 
   return (
     <div className="flex flex-col gap-3">
@@ -81,7 +98,7 @@ export function CoachPanel({ move, evalAfter, onLine }: Props) {
           <span style={{ color: meta.color }}>{meta.phrase}</span>
         </h3>
       </div>
-      <MoveExplanation move={move} />
+      <MoveExplanation explanation={explanation} loading={explanationLoading} onRef={onRef} />
 
       {alternative && (
         <p className="flex items-center gap-2 rounded-lg bg-panel-2/60 px-3 py-2 text-sm">
@@ -90,19 +107,33 @@ export function CoachPanel({ move, evalAfter, onLine }: Props) {
         </p>
       )}
 
-      {/* Actions: grows with "Profundizar" (phase 4) and "Pruébalo tú" (phase 6). */}
-      {alternative && (
+      {/* Actions: "Profundizar" (level 2), "Ver línea"; "Pruébalo tú" comes in phase 6. */}
+      {(alternative || canDeepen) && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Acciones">
-          <button
-            type="button"
-            className="btn"
-            aria-expanded={lineOpen}
-            onClick={() => {
-              setLineOpen((open) => !open)
-            }}
-          >
-            <ListTree size={16} /> {lineOpen ? 'Ocultar línea' : 'Ver línea'}
-          </button>
+          {canDeepen && (
+            <button
+              type="button"
+              className="btn"
+              aria-expanded={deep}
+              onClick={() => {
+                onDeep(!deep)
+              }}
+            >
+              <BookOpen size={16} /> {deep ? 'Menos detalle' : 'Profundizar'}
+            </button>
+          )}
+          {alternative && (
+            <button
+              type="button"
+              className="btn"
+              aria-expanded={lineOpen}
+              onClick={() => {
+                setLineOpen((open) => !open)
+              }}
+            >
+              <ListTree size={16} /> {lineOpen ? 'Ocultar línea' : 'Ver línea'}
+            </button>
+          )}
         </div>
       )}
       {alternative && lineOpen && (

@@ -27,10 +27,17 @@ export interface ShownMove {
   classification: Classification | null // null = no classification (exploring, not analysed)
 }
 
+/** A square the explanation points at: piece in danger (red) or target / saved piece (amber). */
+export interface MarkedSquare {
+  square: string
+  role: 'danger' | 'target'
+}
+
 interface Props {
   fen: string
   orientation: Color
   arrows: BoardArrow[]
+  marks?: MarkedSquare[]
   shownMove: ShownMove | null
   /** Slide pieces (single steps) or jump (long jumps). */
   animate: boolean
@@ -47,8 +54,27 @@ const NEUTRAL_TO = 'rgba(255, 255, 255, 0.36)'
 /** Hex alpha suffixes: origin ~30 %, target ~55 %. */
 const FROM_ALPHA = '4d'
 const TO_ALPHA = '8c'
+/** Explanation marks: a ring plus a tint over whatever colour the square already has. */
+const MARK_STYLES: Record<MarkedSquare['role'], CSSProperties> = {
+  danger: {
+    boxShadow: 'inset 0 0 0 4px rgba(220, 38, 38, 0.95)',
+    backgroundImage: 'linear-gradient(rgba(220, 38, 38, 0.35), rgba(220, 38, 38, 0.35))',
+  },
+  target: {
+    boxShadow: 'inset 0 0 0 4px rgba(245, 158, 11, 0.95)',
+    backgroundImage: 'linear-gradient(rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.3))',
+  },
+}
 
-export function ReviewBoard({ fen, orientation, arrows, shownMove, animate, onMove }: Props) {
+export function ReviewBoard({
+  fen,
+  orientation,
+  arrows,
+  marks = [],
+  shownMove,
+  animate,
+  onMove,
+}: Props) {
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null)
   const turn: Color = new Chess(fen).turn() === 'w' ? 'white' : 'black'
 
@@ -61,8 +87,11 @@ export function ReviewBoard({ fen, orientation, arrows, shownMove, animate, onMo
       styles[shownMove.from] = { backgroundColor: color ? color + FROM_ALPHA : NEUTRAL_FROM }
       styles[shownMove.to] = { backgroundColor: color ? color + TO_ALPHA : NEUTRAL_TO }
     }
+    for (const mark of marks) {
+      styles[mark.square] = { ...styles[mark.square], ...MARK_STYLES[mark.role] }
+    }
     return styles
-  }, [shownMove])
+  }, [shownMove, marks])
 
   const badgeSquare = shownMove?.classification ? shownMove.to : null
   const squareRenderer = ({ square, children }: SquareHandlerArgs & { children?: ReactNode }) => (

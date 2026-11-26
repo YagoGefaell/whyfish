@@ -37,12 +37,54 @@ describe('ReviewView', () => {
     expect(screen.getByRole('table', { name: 'Resumen' })).toBeInTheDocument()
   })
 
-  it('"Empezar revisión" goes to move 1 with a coach sentence', () => {
+  it('"Empezar revisión" goes to move 1 with its explanation', async () => {
+    mockApi([
+      {
+        path: '/api/games/3/moves/0/explanation?level=1',
+        body: {
+          ply: 0,
+          level: 1,
+          text: 'Esta jugada debilita la protección de tu rey. [[e4]] era mejor.',
+          refs: [{ san: 'e4', line: 'best', base: 0, path: ['e2e4'] }],
+          annotations: [
+            { kind: 'square', role: 'danger', square: 'e1', from_square: null, to_square: null },
+          ],
+          idea: 'positional',
+        },
+      },
+      {
+        path: '/api/games/3/moves/0/explanation?level=2',
+        body: {
+          ply: 0,
+          level: 2,
+          text: 'Primer párrafo.\n\nSegundo párrafo con [[e4]].',
+          refs: [{ san: 'e4', line: 'best', base: 0, path: ['e2e4'] }],
+          annotations: [],
+          idea: 'positional',
+        },
+      },
+    ])
     renderReview()
     startReview()
     expect(screen.getByRole('tab', { name: 'Revisión' })).toHaveAttribute('aria-selected', 'true')
     expect(verdict()).toHaveTextContent('f3 es una imprecisión')
-    expect(within(panel()).getByLabelText('Explicación')).toHaveTextContent('«imprecisión»')
+    await waitFor(() => {
+      expect(within(panel()).getByLabelText('Explicación')).toHaveTextContent(
+        'debilita la protección de tu rey',
+      )
+    })
+    // The square the explanation talks about is marked on the board.
+    expect(document.getElementById('review-board-square-e1')?.innerHTML).toContain('inset')
+
+    // "Profundizar" shows level 2 (several paragraphs).
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Profundizar' }))
+    await waitFor(() => {
+      expect(within(panel()).getByLabelText('Explicación')).toHaveTextContent('Segundo párrafo')
+    })
+
+    // A move of the text is clickable: it is shown on the board as a variation.
+    fireEvent.click(within(panel()).getAllByRole('button', { name: 'e4' })[0])
+    expect(banner()).toBeInTheDocument()
   })
 
   it('navigates with the arrow keys, Home and End', () => {

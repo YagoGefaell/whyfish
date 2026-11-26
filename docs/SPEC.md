@@ -144,7 +144,8 @@ Para cada jugada se construye un `MoveFacts` serializable, sin texto libre:
 - `threats_allowed` (qué gana el rival con su mejor respuesta y cómo).
 - `threats_created` (qué amenaza la jugada hecha / la mejor).
 - `tactical_motifs` detectados en las variantes: clavada, doble ataque, ataque a la
-  descubierta, jaque doble, rayos X, desviación, sobrecarga, mate en N, promoción.
+  descubierta, jaque doble, mate en N, promoción. **Desviación, sobrecarga y rayos X quedan
+  para más adelante** (difíciles de detectar sin falsos positivos; decidido en la Fase 4).
 - `king_safety` (escudo de peones, columnas abiertas hacia el rey, atacantes cercanos).
 - `pawn_structure` cambios: aislados, doblados, retrasados, pasados creados/perdidos.
 - `piece_activity` (movilidad antes/después; piezas sin desarrollar en apertura).
@@ -153,16 +154,57 @@ Para cada jugada se construye un `MoveFacts` serializable, sin texto libre:
 Cada detector es una función pura con tests propios. Si un detector no está seguro, no
 emite el hecho: **es preferible callar a afirmar algo falso**.
 
+Cada hecho lleva **las casillas implicadas** (pieza colgada, atacantes, jugada que amenaza,
+piezas del doble ataque…) para poder dibujarlo en el tablero. Los hechos salen de las líneas
+MultiPV ya guardadas por el análisis (antes y después de la jugada) + python-chess; no se vuelve
+a llamar al motor.
+
+Reglas para no afirmar de más (Fase 4):
+- El material de una línea se cuenta en las primeras 6 medias jugadas (alargando si hay un
+  intercambio en curso) y se cierra con SEE. "Gana / ganaba X" solo si la captura que lo
+  consigue está entre las 5 primeras medias jugadas de la línea (las que el texto muestra), no
+  solo en el cierre con SEE, y —para jugadas buenas— si la línea deja al que mueve con ≥ 55 % de
+  victoria (si no, suele ser un sacrificio rival a medias).
+- Una pieza se nombra ("pierdes el caballo de c3") solo si explica la diferencia y el otro bando
+  no recuperó más que peones.
+- Doble ataque y clavada exigen que la pieza que ataca no se pueda ganar (SEE).
+- Las amenazas nuevas de una jugada son las de la pieza movida o descubiertas por ella, y no se
+  calculan si se respondía a un jaque.
+
 ## 5. Explicaciones (`explain/`)
 
 ### 5.1 Niveles
-- **Nivel 1 (simple):** 1–2 frases, lenguaje llano, centrado en *la idea*:
+- **Nivel 1 (simple):** 1–2 frases, lenguaje llano, sin jerga innecesaria ni cifras de
+  evaluación, centrado en *la idea principal* (qué amenaza no viste, qué pieza quedó colgada,
+  qué ganaba la mejor jugada):
   "Dejaste el caballo de f3 sin defensa; tras …[[Bxf3]] pierdes una pieza. Mejor era [[Be2]]."
 - **Nivel 2 (profundizar):** 1 párrafo + variante comentada jugada a jugada, comparación
   hecha vs. mejor, concepto general aplicable ("antes de mover, revisa qué deja de defender la pieza").
 - **Nivel 3 (chat):** el LLM recibe la posición, los hechos y **herramientas**
   (`evaluate_position(fen)`, `analyze_move(fen, san)`, `get_threats(fen)`,
   `legal_moves(fen)`) y responde solo con datos obtenidos de ellas.
+
+**Idea principal** (`explain/idea.py`), por prioridad:
+- Errores (?!, ?, ??): mate permitido > mate perdido > pieza colgada > táctica permitida
+  (doble ataque, clavada…) > material perdido > material que ganaba la mejor > comentario
+  posicional (debilidad del enroque, peones doblados/aislados solo en ?!; motivo de la mejor:
+  enroque, desarrollo, amenaza, defensa). Si no hay hechos, una frase prudente sin motivo.
+- Oportunidad perdida (✗): mate perdido > material perdido primero.
+- Gran jugada (!): **por qué fallaban las alternativas**, con la segunda línea del MultiPV
+  («[[X]] era la única: si [[Y]], sigue [[Z]] y …»). Si además fuerza mate, el mate va primero.
+- Brillante (!!): el sacrificio primero.
+- Jugadas buenas (!, !!, ★): mate > material ganado > amenaza creada > amenaza neutralizada.
+  La ★ solo se explica si hay alguna de estas ideas y no es una recaptura obvia ni la única
+  legal. Excelente/buena: «[[X]] era algo más precisa» con su motivo si lo hay.
+- Teoría: nombre de la apertura.
+
+Persona: segunda persona en las jugadas del usuario, tercera ("las blancas…") en las del rival.
+Piezas por su nombre en español; jugadas en SAN inglés marcadas `[[...]]`.
+
+**Apoyo visual:** cada idea trae anotaciones sobre la posición tras la jugada: flecha roja para
+la amenaza del rival, casilla roja para la pieza en peligro, flecha ámbar para lo que ataca una
+jugada buena, casilla ámbar para la pieza objetivo o salvada. El nivel 1 dibuja solo las de la
+idea principal (máx. 3 elementos); el nivel 2 puede mostrar hasta 6.
 
 ### 5.2 Generación
 1. **Plantillas deterministas** (proveedor `none`) para todos los niveles 1 y 2. Siempre disponibles.
@@ -174,7 +216,8 @@ emite el hecho: **es preferible callar a afirmar algo falso**.
    en los hechos o ser legal en el contexto citado. Si falla → reintento con el error → si vuelve a
    fallar, plantilla. Las plantillas usan el mismo formato de marcas.
 4. **Frontend:** renderiza cada `[[SAN]]` como una jugada clicable que se muestra en el tablero.
-5. Caché por `(fen, move, level, provider, model, prompt_version)`.
+5. Caché por `(fen, move, level, provider, model, prompt_version)` (tabla `Explanation`, en la
+   Fase 5: las plantillas se calculan bajo demanda en milisegundos).
 6. Generación perezosa: nivel 1 para momentos clave al terminar el análisis; el resto bajo demanda.
 
 ### 5.3 Proveedores
@@ -191,7 +234,10 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
 - `GET /games/{id}/review` resumen + jugadas clasificadas
 - `POST /analysis/evaluate` (`{fen, moves?, multipv?}`): evaluación bajo demanda con el pool de
   análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada. Herramienta del coach (Fase 6).
-- `GET /games/{id}/moves/{ply}/explanation?level=1|2`
+- `GET /games/{id}/moves/{ply}/explanation?level=1|2` → `{ply, level, text, refs, annotations,
+  idea}`: `text` con marcas `[[SAN]]` (null si no hay nada que decir), `refs` una por marca en
+  orden (`{san, line, base, path}`: jugadas UCI desde la posición `base` de la partida, para
+  mostrarla en el tablero), `annotations` (flechas/casillas con su papel).
 - `POST /games/{id}/moves/{ply}/chat` (streaming)
 - `GET /games` historial
 

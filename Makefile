@@ -1,6 +1,6 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze explain-report \
         lint lint-backend lint-frontend fmt
 
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "make test-integration  Tests against the real Stockfish (reduced search times)"
 	@echo "make test-e2e  Browser tests (Playwright) on their own DB and ports; screenshots in frontend/e2e-artifacts/"
 	@echo "make analyze PGN=file.pgn  Analyse a PGN with Stockfish and print the review"
+	@echo "DATABASE_URL=sqlite:////tmp/x.db make explain-report  Explanations review report (HTML)"
 	@echo "make lint      ruff + mypy --strict, ESLint + Prettier + tsc"
 	@echo "make fmt       Auto-format backend and frontend"
 
@@ -47,6 +48,10 @@ install-e2e:
 analyze:
 	@test -n "$(PGN)" || (echo "Usage: make analyze PGN=path/to/game.pgn" && exit 1)
 	cd backend && uv run python -m app.analysis.cli "$(abspath $(PGN))" $(ARGS)
+
+explain-report:
+	@test -n "$(DATABASE_URL)" || (echo "Usage: DATABASE_URL=sqlite:////tmp/x.db make explain-report [OUT=file.html]" && exit 1)
+	cd backend && uv run python -m app.explain.report --out "$(abspath $(or $(OUT),docs/reports/explanations-fase4.html))"
 
 lint: lint-backend lint-frontend
 

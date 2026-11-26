@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { MoveReview, Review } from '../../api/analysis'
+import type { MoveRef, MoveReview, Review } from '../../api/analysis'
 import type { Color, GameState } from '../../api/games'
 import { CoachPanel } from './CoachPanel'
 import { CLASSIFICATIONS, evalLabel, moveNumber, showsAlternative } from './classification'
@@ -9,13 +9,16 @@ import { EvalGraph } from './EvalGraph'
 import { MoveList, type ListMove } from './MoveList'
 import { playerNames } from './names'
 import { NavBar } from './NavBar'
-import { ReviewBoard, type BoardArrow, type ShownMove } from './ReviewBoard'
+import { ReviewBoard, type BoardArrow, type MarkedSquare, type ShownMove } from './ReviewBoard'
 import { ColorDot, SummaryPanel } from './SummaryPanel'
 import { useEvaluation } from './useEvaluation'
+import { useExplanation } from './useExplanation'
 import { fenAfter, fenStart, mainLineFens, sansToUcis, ucisToSans } from './variation'
 
 // Intense green; react-chessboard applies the 0.8 opacity (ReviewBoard ARROW_OPTIONS).
 const BEST_ARROW = '#16a34a'
+/** Explanation arrows: the opponent's threat (red), what a good move attacks (amber). */
+const ANNOTATION_ARROW = { threat: '#dc2626', attack: '#f59e0b' } as const
 
 interface Exploration {
   base: number // main-line position the variation starts from
@@ -51,6 +54,8 @@ export function ReviewView({ game, review, status, meta }: Props) {
   const [animate, setAnimate] = useState(false)
   const [exploration, setExploration] = useState<Exploration | null>(null)
   const [tab, setTab] = useState<Tab>('summary')
+  // "Profundizar" is open for this position only (closes when moving on).
+  const [deepAt, setDeepAt] = useState<number | null>(null)
 
   /** Long jump: no animation, leaves any variation, goes to the review tab. */
   const jump = useCallback((p: number) => {
@@ -171,7 +176,25 @@ export function ReviewView({ game, review, status, meta }: Props) {
 
   const reviewed: MoveReview | null =
     !exploration && review && shownPosition > 0 ? (review.moves[shownPosition - 1] ?? null) : null
+  const deep = deepAt === position && reviewed !== null
+  const explainedPly = review && tab === 'review' && reviewed ? reviewed.ply : null
+  const level1 = useExplanation(game.id, explainedPly, 1)
+  const level2 = useExplanation(game.id, deep ? explainedPly : null, 2)
+  const explanation = deep && level2.explanation ? level2 : level1
+
+  const onRef = (ref: MoveRef) => {
+    setAnimate(false)
+    const mainLine = moves.slice(ref.base, ref.base + ref.path.length)
+    if (ref.path.every((uci, i) => mainLine[i] === uci)) {
+      setExploration(null)
+      setPosition(ref.base + ref.path.length)
+    } else {
+      setExploration({ base: ref.base, moves: ref.path, index: ref.path.length })
+    }
+  }
+
   const arrows: BoardArrow[] = []
+  const marks: MarkedSquare[] = []
   let shownMove: ShownMove | null = null
   if (exploration) {
     const lastUci = shownMoves.at(-1)
@@ -182,6 +205,18 @@ export function ReviewView({ game, review, status, meta }: Props) {
     if (uci) shownMove = { ...squares(uci), classification: reviewed?.classification ?? null }
     if (reviewed?.best_uci && showsAlternative(reviewed)) {
       arrows.push({ ...squares(reviewed.best_uci), color: BEST_ARROW })
+    }
+    // What the explanation talks about, drawn on the position after the move.
+    if (tab === 'review' && explanation.explanation?.ply === reviewed?.ply) {
+      for (const a of explanation.explanation?.annotations ?? []) {
+        if (a.kind === 'arrow' && a.from_square && a.to_square) {
+          if (a.role === 'threat' || a.role === 'attack') {
+            arrows.push({ from: a.from_square, to: a.to_square, color: ANNOTATION_ARROW[a.role] })
+          }
+        } else if (a.square && (a.role === 'danger' || a.role === 'target')) {
+          marks.push({ square: a.square, role: a.role })
+        }
+      }
     }
   }
   const barEval = exploration ? (evaluation?.white ?? null) : (review?.evals[shownPosition] ?? null)
@@ -246,6 +281,7 @@ export function ReviewView({ game, review, status, meta }: Props) {
               fen={fen}
               orientation={orientation}
               arrows={arrows}
+              marks={marks}
               shownMove={shownMove}
               animate={animate}
               onMove={onBoardMove}
@@ -361,6 +397,13 @@ export function ReviewView({ game, review, status, meta }: Props) {
                     move={reviewed}
                     evalAfter={review.evals[position] ?? null}
                     onLine={onLine}
+                    explanation={explanation.explanation}
+                    explanationLoading={explanation.loading}
+                    deep={deep}
+                    onDeep={(open) => {
+                      setDeepAt(open ? position : null)
+                    }}
+                    onRef={onRef}
                   />
                 )}
               </div>

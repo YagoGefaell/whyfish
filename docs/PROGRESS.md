@@ -151,8 +151,29 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
   `frontend/e2e-artifacts/board-*.png`. Lichess bloquea navegadores headless (Cloudflare), así
   que la comparación se hizo contra el CSS de chessground.
 
+### Fase 4 — Hechos y explicaciones por plantilla (pendiente de revisión)
+- **Hechos** (`analysis/facts.py` + `analysis/detectors/`): piezas colgadas (SEE), amenazas
+  creadas y neutralizadas, mate en 1 como amenaza, doble ataque, clavada, ataque a la
+  descubierta, jaque doble, resultado de cada línea (material cerrado con SEE, mate, capturas,
+  coronación), estructura de peones, escudo del rey, desarrollo, fase. Con casillas. Sin motor:
+  salen de las líneas MultiPV guardadas.
+- **Explicaciones** (`explain/`): idea principal por prioridad (SPEC §5.1, con la regla de la
+  gran jugada), plantillas de nivel 1 y 2 en español con `[[SAN]]`, referencia por marca
+  (posición base + jugadas UCI), validación de marcas lista para la Fase 5, anotaciones (nivel 1
+  ≤ 3, nivel 2 ≤ 6). ~8 ms por explicación: sin caché hasta la Fase 5.
+- **API:** `GET /api/games/{id}/moves/{ply}/explanation?level=1|2`.
+- **Frontend:** texto con jugadas clicables (se muestran en el tablero como variante, o se salta
+  a la jugada si es de la partida), "Profundizar", flechas roja/ámbar y casillas marcadas.
+- **Informe:** muestra fija de 20 (regla en `explain/report.py`), 19 de las partidas del usuario,
+  con diagrama, textos y hechos usados marcados. Las partidas del usuario se leyeron de
+  `data/whyfish.db` en solo lectura (SHA-1 comprobado antes y después) y se analizaron en una base
+  temporal.
+- **Tests:** backend 274 (29 de detectores, 37 de explicaciones, API, informe), frontend 45, e2e
+  con captura `*-review-explanation.png`.
+
 ## Pendiente / siguiente paso
-- Fase 4: proponer plan y esperar OK. `MoveExplanation` es el hueco a rellenar; la fila de
+- **Fase 4 implementada, pendiente de la revisión del usuario** (no cerrar hasta su OK).
+  Informe: `docs/reports/explanations-fase4.html` (regenerar con `make explain-report`).
   acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 6).
 
 ## Decisiones tomadas
@@ -235,6 +256,12 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - Nivel **"Personalizado"** con selector de Elo (1320–3190, rango de `UCI_Elo` en Stockfish 19).
 
 ## Deuda técnica / dudas abiertas
+- **Brillante falso (Fase 2), visto en el informe:** 5… Bd6 de la partida 1 sale como !! porque
+  la variante principal del motor solo tiene 2 medias jugadas (Bd6 Bxd6) y `_material_drop` de
+  `classify.py` no cierra el intercambio pendiente con SEE (Qxd6). Propuesta: cerrar con SEE como
+  hace `detectors/lines.py`. Pendiente de decisión del usuario (cambia la clasificación).
+- Explicaciones genéricas en ?! posicionales sin hechos (el informe las marca "faltan hechos").
+- Desviación, sobrecarga y rayos X sin detectar (SPEC §4).
 - Elo de Principiante/Novato aproximado y sin calibrar.
 - Fixture frágil: Kasparov 24.Rxd4 queda en ~46,3 % con umbral 45; otra versión de Stockfish
   podría cambiarlo. Si un fixture cambia tras actualizar el motor, revisar con el usuario.
