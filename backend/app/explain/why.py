@@ -131,14 +131,23 @@ def sequence_end(board: chess.Board, ucis: Sequence[str], c: Consequence, t: Fac
         return c.ply
     if c.kind == "material":  # not settled (line capped): show all of it
         return len(ucis) - 1
-    end = min(len(ucis), t.why_quiet_plies) - 1
+    # No clear consequence: about `why_quiet_plies` plies, ending on a quiet position with the
+    # material as at the start (never in the middle of an exchange, never looking like a loss
+    # that the line wins back later).
+    color = board.turn
+    start = material.balance(board, color)
     b = board.copy(stack=False)
-    for uci in ucis[: end + 1]:
+    even: list[int] = []
+    for i, uci in enumerate(ucis):
         b.push_uci(uci)
-    while end < len(ucis) - 1 and not _quiet(b, board.turn, t):
-        end += 1
-        b.push_uci(ucis[end])
-    return end
+        if material.balance(b, color) == start and _quiet(b, color, t):
+            even.append(i)
+    target = min(len(ucis), t.why_quiet_plies) - 1
+    before = [i for i in even if i <= target]
+    after = [i for i in even if i > target]
+    if (before and target - before[-1] <= 2) or not after:
+        return before[-1] if before else target
+    return after[0]
 
 
 # --- building the sequence -------------------------------------------------------------------
@@ -167,20 +176,24 @@ def build_why(
 
     steps: list[WhyStep] = []
     b = board.copy(stack=False)
+    last_capture: int | None = None  # square of the previous step's capture
     for i, uci in enumerate(shown):
         move = chess.Move.from_uci(uci)
         label = _label(b, move)
         created = next((target for start, _, _, _, target in arrows if start == i), None)
         defense = defense_side and i > 0 and b.turn == user
-        text = _caption(
-            b, move, user, recapture=i == 0 and facts.recapture, threat=created, defense=defense
-        )
+        if i == 0:
+            recapture = facts.recapture
+        else:
+            recapture = last_capture == move.to_square and b.is_capture(move)
+        text = _caption(b, move, user, recapture=recapture, threat=created, defense=defense)
         if defense:
             text = "Tu mejor defensa: " + _lower(text)
         if i == 0 and alternative:
             text = "En su lugar, " + _lower(text)
         san = b.san(move)
         color = "white" if b.turn == chess.WHITE else "black"
+        last_capture = move.to_square if b.is_capture(move) else None
         b.push(move)
         steps.append(
             WhyStep(
@@ -252,10 +265,7 @@ def _caption(
     was_check = b.is_check()
     legal = list(b.legal_moves)
     captured = _captured(b, move)
-    previous = b.peek() if b.move_stack else None
-    is_recapture = recapture or (
-        previous is not None and b.is_capture(move) and previous.to_square == move.to_square
-    )
+    is_recapture = recapture and b.is_capture(move)
     after = b.copy(stack=False)
     after.push(move)
 
@@ -383,9 +393,14 @@ def _material_summary(
 ) -> str:
     loses = c.material < 0
     lost, won = (c.lost, c.won) if loses else (c.won, c.lost)
-    if not c.settled:
-        # The line ends before the exchanges do: only the resolved amount is known.
+    promoted = c.opponent_promoted if loses else c.promoted
+    if not c.settled or not lost:
+        # The line ends before the exchanges do, or the material comes from a promotion: only
+        # the amount is known for sure.
         what = es.material(abs(c.material))
+        if promoted and c.settled:
+            who = "el rival corona" if (you == loses) else "coronas"
+            what += f" ({who} un peón)"
     else:
         what = es.pieces(lost)
         if won:
@@ -464,7 +479,7 @@ def _quiet_summary(
             )
         return f"Con {alt} en su lugar, {_PAST[other]}; con {played} jugada, {_NOW[now]}."
     if kind == "idea" or facts.best_line is None or not facts.best_line.sans:
-        return es.capitalize(f"no se gana material enseguida, pero {_NOW[now]}.")
+        return f"Sin ganancia inmediata de material: tras la jugada, {_NOW[now]}."
     best = mt.move(facts.best_line, 0)
     before = _category(user_win(facts.win_before))
     if before == now:

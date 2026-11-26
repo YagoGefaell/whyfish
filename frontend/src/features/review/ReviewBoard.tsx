@@ -27,10 +27,13 @@ export interface ShownMove {
   classification: Classification | null // null = no classification (exploring, not analysed)
 }
 
-/** A square the explanation points at: piece in danger (red) or target / saved piece (amber). */
+/**
+ * A square the explanation points at: piece in danger (red), target / saved piece (amber), or
+ * the consequence of a good idea (green, "Ver la idea").
+ */
 export interface MarkedSquare {
   square: string
-  role: 'danger' | 'target'
+  role: 'danger' | 'target' | 'good'
 }
 
 interface Props {
@@ -43,6 +46,10 @@ interface Props {
   animate: boolean
   /** A legal move made on the board (any side to move): enters/extends exploration. */
   onMove: (uci: string) => void
+  /** Pieces can be dragged (false while a sequence is being replayed). */
+  interactive?: boolean
+  /** Duration of the slide when `animate` (ms). */
+  animationMs?: number
 }
 
 /** Best-move arrow: intense green, thicker and more opaque than the default, visible over pieces. */
@@ -64,6 +71,10 @@ const MARK_STYLES: Record<MarkedSquare['role'], CSSProperties> = {
     boxShadow: 'inset 0 0 0 4px rgba(245, 158, 11, 0.95)',
     backgroundImage: 'linear-gradient(rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.3))',
   },
+  good: {
+    boxShadow: 'inset 0 0 0 4px rgba(22, 163, 74, 0.95)',
+    backgroundImage: 'linear-gradient(rgba(22, 163, 74, 0.35), rgba(22, 163, 74, 0.35))',
+  },
 }
 
 export function ReviewBoard({
@@ -74,6 +85,8 @@ export function ReviewBoard({
   shownMove,
   animate,
   onMove,
+  interactive = true,
+  animationMs = 200,
 }: Props) {
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null)
   const turn: Color = new Chess(fen).turn() === 'w' ? 'white' : 'black'
@@ -147,7 +160,8 @@ export function ReviewBoard({
           allowDrawingArrows: false,
           arrowOptions: ARROW_OPTIONS,
           showAnimations: animate,
-          animationDurationInMs: 200,
+          animationDurationInMs: animationMs,
+          allowDragging: interactive,
           onPieceDrop,
           squareRenderer,
           ...BOARD_COLORS,

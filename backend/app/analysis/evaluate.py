@@ -1,7 +1,7 @@
-"""On-demand evaluation of any position (exploring variations; coach tool in phase 6).
+"""On-demand evaluation of any position (exploring variations).
 
 The response is plain facts computed by the engine and python-chess: scores, lines in UCI
-and SAN, terminal status. Nothing here is free text, so it can be handed to an LLM as-is.
+and SAN, terminal status. No free text.
 """
 
 from collections.abc import Sequence

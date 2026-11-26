@@ -1,7 +1,7 @@
 """Explanation of one move of a reviewed game: facts -> main idea -> template (SPEC §5).
 
-Templates only (provider `none`); the LLM providers of Phase 5 plug in here, with the same
-marks and the same validation.
+Templates only (no LLM, CLAUDE.md); the marks and their validation would also serve a possible
+future AI.
 """
 
 from collections.abc import Sequence

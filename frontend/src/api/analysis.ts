@@ -109,6 +109,48 @@ export interface Explanation {
   idea: string | null
 }
 
+/** One step of "Ver por qué": the move, the position after it and what it does. */
+export interface WhyStep {
+  index: number
+  label: string // "21…dxc3"
+  san: string
+  uci: string
+  fen: string
+  color: Color
+  caption: string
+  /** The user's best defence according to the engine (not what was played). */
+  defense: boolean
+  consequence: boolean
+  arrows: { from_square: string; to_square: string }[]
+}
+
+/** "Ver por qué" / "Ver la idea": the sequence up to the consequence of a move. */
+export interface Why {
+  kind: 'refutation' | 'idea'
+  tone: 'bad' | 'good'
+  base_ply: number
+  start_fen: string
+  title: string
+  alternative: string | null
+  steps: WhyStep[]
+  consequence_ply: number | null
+  /** Moves marked as [[SAN]]; `refs` has one entry per mark. */
+  summary: string
+  refs: MoveRef[]
+  step_ms: number
+}
+
+export type WhyKind = 'refutation' | 'idea' | 'solution'
+
+/** "Pruébalo tú": the verdict on an attempt and, if it fails, why. */
+export interface TryResult {
+  uci: string
+  san: string
+  classification: Classification
+  correct: boolean
+  why: Why | null
+}
+
 const post = <T>(path: string, body?: unknown, signal?: AbortSignal) =>
   request<T>(path, {
     method: 'POST',
@@ -128,4 +170,8 @@ export const analysisApi = {
     ),
   evaluate: (fen: string, moves: string[], signal?: AbortSignal) =>
     post<Evaluation>('/analysis/evaluate', { fen, moves }, signal),
+  why: (gameId: number, ply: number, kind: WhyKind, signal?: AbortSignal) =>
+    request<Why>(`/games/${String(gameId)}/moves/${String(ply)}/why?kind=${kind}`, { signal }),
+  tryMove: (gameId: number, ply: number, uci: string, signal?: AbortSignal) =>
+    post<TryResult>(`/games/${String(gameId)}/moves/${String(ply)}/try`, { uci }, signal),
 }

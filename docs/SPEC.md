@@ -244,14 +244,52 @@ idea principal (máx. 3 elementos); el nivel 2 puede mostrar hasta 6.
 ### 5.3 Punto de consecuencia (`analysis/consequence.py`)
 Función pura compartida por el texto de nivel 1 y "Ver por qué": dada una línea (posición +
 jugadas UCI) devuelve el ply donde se materializa lo que hace mala (o buena) la jugada —mate,
-coronación o el último cambio de material **resuelto** (quiescencia; nunca a mitad de un
-intercambio)— y el balance resuelto en ese punto respecto al inicio (p. ej. "pierdes la dama
-por un caballo"). En ?? y ? la idea principal del nivel 1 es la mayor consecuencia de la
-refutación (mate > material perdido al final de la línea resuelta), no un hecho menor.
+coronación o un cambio de material **resuelto** (quiescencia; nunca a mitad de un
+intercambio)— y el balance en ese punto (p. ej. "pierdes la dama a cambio de caballo"). El punto
+es la **primera** posición tranquila que ya tiene el balance final (con un peón de tolerancia
+si la diferencia es de una pieza o más) y desde la que el perdedor no recupera más que esa
+tolerancia: los cambios menores posteriores no alargan la historia. En ?? y ? la idea principal
+del nivel 1 es la mayor consecuencia de la refutación (mate > material perdido), no un hecho
+menor.
 
-### 5.4 Ver por qué (Fase 5)
-Detalle en ROADMAP Fase 5: reproducción paso a paso hasta el punto de consecuencia, frases por
-paso desde los hechos, resumen final, extensión de líneas cortas con el motor y "Pruébalo tú".
+### 5.4 Ver por qué (Fase 5, `explain/why.py`, `api/why.py`)
+- **Qué línea:** jugadas que no son la mejor → la refutación tras la jugada hecha; "!" → la
+  refutación de la segunda opción («¿y si en su lugar…?»); "!!" → la línea de la entrega; ★
+  con explicación → la línea de la mejor. "Ver la solución" de "Pruébalo tú" → la línea de la
+  mejor jugada.
+- **Hasta dónde:** hasta el punto de consecuencia si la consecuencia va en el sentido que
+  explica la jugada (en contra del que mueve en refutaciones y en la alternativa de la "!", a
+  favor en la idea); si no, se trata como "sin consecuencia clara": unas 8 medias jugadas,
+  terminando en una posición tranquila con el material igual que al empezar.
+- **Extensión:** si la línea termina a mitad de un intercambio, su consecuencia no va seguida
+  de 4 medias jugadas sin cambio de material (no aplica al mate) o, sin consecuencia, mide
+  menos de 12, se pide al motor la continuación desde su última posición (0,2 s, una línea,
+  `WHY_EXTEND_TIME_S`) hasta 20 medias jugadas. Cada búsqueda se guarda en `PositionAnalysis`
+  con su propia clave de ajustes: la misma secuencia sale siempre igual. Sin motor se usa la
+  línea guardada tal cual.
+- **Frases por paso** (desde los hechos, piezas siempre respecto al usuario: «tu dama», «la
+  torre rival»): mate con la pieza («El caballo rival da jaque mate») > captura, siempre con
+  lo capturado («Tu torre recupera: captura la torre rival»; el rey o la pieza que captura a
+  quien da jaque: «Tu rey captura el peón que daba jaque») > jaque > respuesta al jaque («tiene
+  que moverse» solo si todas las jugadas legales son del rey; «se interpone», «se aparta») >
+  coronación > amenaza que la secuencia ejecuta después (con flecha roja hasta entonces) >
+  enroque > «va a e2». En una refutación de la jugada del usuario, sus jugadas posteriores son
+  la mejor defensa del motor: «Tu mejor defensa: …» y estilo distinto en la secuencia.
+- **Resumen:** material con lo perdido y lo ganado y el balance en peones («Pierdes la dama y
+  el alfil a cambio de torre y caballo (unos 4 peones de diferencia)»); en ? y ?? con poco
+  material, también lo que dice la evaluación; mate («Esta jugada permite mate inmediato»,
+  «Das mate en 3»); sin consecuencia clara, comparación sin cifras con datos ya conocidos
+  («Con [[X]] mantenías la igualdad; tras tu jugada, el rival queda algo mejor»). Si la posición
+  ya estaba decidida antes (win% < 15 o > 85) se dice delante («Tu posición ya estaba perdida,
+  pero…»).
+- **Reproducción:** automática (`WHY_STEP_MS`, 1 s), pausa, ◀ ▶ (también con el teclado),
+  espacio, Esc; piezas que se deslizan, origen y destino resaltados, casilla de la consecuencia
+  en rojo (errores) o verde (ideas). Controles en el sitio de la barra de navegación (bajo el
+  tablero en móvil, al pie del panel en escritorio); frase del paso y tarjeta final en el
+  panel (escritorio) o en una franja bajo el tablero (móvil). Nada tapa el tablero.
+- **Pruébalo tú** (?!, ?, ??, ✗): posición anterior, sin la flecha de la mejor; si la jugada es
+  tan buena como la mejor (★, !, !!) se felicita; si no: «Intentar otra vez», «Ver por qué falla
+  tu intento» y «Ver la solución».
 
 ## 6. API (orientativa)
 Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desarrollo y en producción.
@@ -261,13 +299,17 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
 - `POST /games/{id}/analysis` lanza análisis · `GET /games/{id}/analysis/stream` (SSE progreso)
 - `GET /games/{id}/review` resumen + jugadas clasificadas
 - `POST /analysis/evaluate` (`{fen, moves?, multipv?}`): evaluación bajo demanda con el pool de
-  análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada (lo usa "Pruébalo tú").
+  análisis; devuelve líneas (UCI + SAN), puntuación y mejor jugada.
 - `GET /games/{id}/moves/{ply}/explanation?level=1|2` → `{ply, level, text, refs, annotations,
   idea}`: `text` con marcas `[[SAN]]` (null si no hay nada que decir), `refs` una por marca en
   orden (`{san, line, base, path}`: jugadas UCI desde la posición `base` de la partida, para
   mostrarla en el tablero), `annotations` (flechas/casillas con su papel).
-- `GET /games/{id}/moves/{ply}/why?kind=refutation|idea` → `{steps: [{san, uci, fen, caption,
-  annotations}], consequence_ply, summary}` (Fase 5).
+- `GET /games/{id}/moves/{ply}/why?kind=refutation|idea|solution` → `{kind, tone, base_ply,
+  start_fen, title, alternative, steps: [{index, label, san, uci, fen, color, caption, defense,
+  consequence, arrows}], consequence_ply, summary, refs, step_ms}` (409 si la jugada no tiene
+  esa secuencia).
+- `POST /games/{id}/moves/{ply}/try` (`{uci}`) → `{uci, san, classification, correct, why}`:
+  "Pruébalo tú" (la posición anterior ya está analizada: solo se evalúa el intento).
 - `GET /games` historial
 
 ## 7. Persistencia

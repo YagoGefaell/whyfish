@@ -113,3 +113,14 @@ def test_position_already_lost_is_said() -> None:
     assert line is not None
     why = build_why(lost, "refutation", line.ucis, WHITE)
     assert why.summary.startswith("Tu posición ya estaba perdida, pero pierdes la dama")
+
+
+def test_promotion_is_summarised_by_the_amount() -> None:
+    # The white pawn promotes: the material comes from the promotion, not from a capture.
+    fen = "8/P5k1/8/8/8/8/8/K7 w - - 0 1"
+    facts = s.make_facts(
+        fen, "a7a8q", [s.line("a7a8q", "g7f6", "a8a1", cp=900)], [s.line("g7f6", cp=-900)], s.C.BEST
+    )
+    why = build_why(facts, "idea", ("a7a8q", "g7f6", "a1b2", "f6e5", "b2c3", "e5d5"), WHITE)
+    assert why.steps[0].caption == "Tu peón corona en dama"
+    assert why.summary == "Tu posición ya estaba ganada: ganas mucho material (coronas un peón)."

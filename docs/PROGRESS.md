@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 4 (hechos y explicaciones por plantilla) — **cerrada** (2026-11-26, informe aprobado por el
-usuario). Siguiente: Fase 5 "Ver por qué" (plan propuesto, pendiente de OK).
+Fase 5 ("Ver por qué") — **implementada, pendiente de la revisión del usuario** (informe
+`docs/reports/why-fase5.html` y prueba en la app). No cerrar hasta su OK.
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -186,13 +186,38 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
 - **Tests:** backend 316 + 16 fixtures reales con Stockfish, frontend 45, e2e con captura
   `*-review-explanation.png`.
 
+### Fase 5 — "Ver por qué" (pendiente de revisión)
+- **Backend:** `explain/why.py` (pura: línea según la clasificación, criterio de extensión,
+  final de la secuencia, frases por paso, resumen), `runner.extend_line` (extensión con el motor
+  cacheada en `PositionAnalysis` con clave propia), `api/why.py`: `GET …/why?kind=` y
+  `POST …/try`. Punto de consecuencia más temprano (los cambios menores posteriores no alargan
+  la historia; SPEC §5.3), también para el texto de nivel 1.
+- **Frontend:** botones "Ver por qué" / "Ver la idea" / "Pruébalo tú" en el panel; reproducción
+  con `useWhyPlayer` (paso a paso, pausa, ◀ ▶, espacio, Esc), `WhyBar` (controles + frase/tarjeta
+  bajo el tablero en móvil), `WhyPanel` (título, frase, secuencia con la defensa del motor en
+  cursiva y discontinua, consecuencia en rojo/verde, tarjeta final), `TryIt`.
+- **Medido:** extensión ~0,2 s por búsqueda (1–2 por secuencia, cacheadas); el informe de 10
+  secuencias se genera en ~40 s con la extensión de todas las jugadas.
+- **Informe:** `docs/reports/why-fase5.html` (`DATABASE_URL=… make why-report`): 10 secuencias
+  de tus partidas (6 errores con material, 1 mate, 1 sin consecuencia, 1 "!", 1 ★), elegidas
+  con regla fija; tus partidas se leyeron de `data/whyfish.db` en solo lectura y se analizaron
+  en una base temporal.
+- **Tests:** backend 330 + 16 fixtures reales, frontend 50, e2e 12 (capturas `*-why-step.png`,
+  `*-why-result.png`, `*-why-try.png` en escritorio y móvil).
+- **Cambio sobre el plan:** "Pruébalo tú" usa `POST /games/{id}/moves/{ply}/try` (la posición
+  anterior ya está en la caché: una sola búsqueda) y "Ver la solución" es `kind=solution`, en vez
+  de un endpoint genérico `POST /analysis/why`.
+
 ## Pendiente / siguiente paso
-- Fase 5 "Ver por qué": plan propuesto, esperar OK del usuario antes de escribir código.
+- Revisión de la Fase 5 por el usuario (informe + app).
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
   `make explain-report`).
   acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 5).
 
 ## Decisiones tomadas
+- **Fase 5 (aprobadas por el usuario, 2026-11-26):** "!" reproduce la alternativa refutada, "!!"
+  la entrega, ★ la mejor; sin consecuencia clara, 8 medias jugadas y resumen comparando
+  evaluaciones sin cifras; 4 medias jugadas de estabilidad tras la consecuencia (no en mate).
 - **Fase 4 (aprobadas por el usuario, 2026-11-26):** una ganancia o pérdida solo se afirma si su
   punto de consecuencia está dentro de la línea y a ≤ 20 medias jugadas (el mismo límite que
   "Ver por qué"); ~25 ms por explicación, sin caché. Sin LLM: explicaciones siempre por

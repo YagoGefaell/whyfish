@@ -1,6 +1,14 @@
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { MoveRef, MoveReview, Review } from '../../api/analysis'
+import {
+  analysisApi,
+  type MoveRef,
+  type MoveReview,
+  type Review,
+  type Why,
+  type WhyKind,
+} from '../../api/analysis'
+import { ApiError } from '../../api/client'
 import type { Color, GameState } from '../../api/games'
 import { CoachPanel } from './CoachPanel'
 import { CLASSIFICATIONS, evalLabel, moveNumber, showsAlternative } from './classification'
@@ -14,11 +22,16 @@ import { ColorDot, SummaryPanel } from './SummaryPanel'
 import { useEvaluation } from './useEvaluation'
 import { useExplanation } from './useExplanation'
 import { fenAfter, fenStart, mainLineFens, sansToUcis, ucisToSans } from './variation'
+import { TryIt, type TryState } from './why/TryIt'
+import { useWhyPlayer } from './why/useWhyPlayer'
+import { WhyBar, WhyPanel } from './why/WhyViews'
 
 // Intense green; react-chessboard applies the 0.8 opacity (ReviewBoard ARROW_OPTIONS).
 const BEST_ARROW = '#16a34a'
 /** Explanation arrows: the opponent's threat (red), what a good move attacks (amber). */
 const ANNOTATION_ARROW = { threat: '#dc2626', attack: '#f59e0b' } as const
+/** Threats drawn while replaying a sequence ("Ver por qué"). */
+const WHY_ARROW = '#dc2626'
 
 interface Exploration {
   base: number // main-line position the variation starts from
@@ -56,13 +69,54 @@ export function ReviewView({ game, review, status, meta }: Props) {
   const [tab, setTab] = useState<Tab>('summary')
   // "Profundizar" is open for this position only (closes when moving on).
   const [deepAt, setDeepAt] = useState<number | null>(null)
+  // "Ver por qué": the sequence being replayed (fromTry: opened from "Pruébalo tú").
+  const [why, setWhy] = useState<{ data: Why; fromTry: boolean } | null>(null)
+  const player = useWhyPlayer(why?.data ?? null)
+  const [whyLoading, setWhyLoading] = useState(false)
+  const [whyError, setWhyError] = useState<{ ply: number; message: string } | null>(null)
+  // "Pruébalo tú": the position before move `ply`.
+  const [trying, setTrying] = useState<{ ply: number; state: TryState } | null>(null)
 
-  /** Long jump: no animation, leaves any variation, goes to the review tab. */
+  /** Long jump: no animation, leaves any variation or replay, goes to the review tab. */
   const jump = useCallback((p: number) => {
     setAnimate(false)
     setExploration(null)
+    setWhy(null)
+    setTrying(null)
     setPosition(p)
     setTab('review')
+  }, [])
+
+  const openWhy = useCallback(
+    (ply: number, kind: WhyKind, fromTry = false) => {
+      setWhyLoading(true)
+      setWhyError(null)
+      analysisApi
+        .why(game.id, ply, kind)
+        .then((data) => {
+          setExploration(null)
+          setTab('review')
+          setWhy({ data, fromTry })
+        })
+        .catch((error: unknown) => {
+          const message =
+            error instanceof ApiError ? error.message : 'No se ha podido preparar la secuencia.'
+          setWhyError({ ply, message })
+        })
+        .finally(() => {
+          setWhyLoading(false)
+        })
+    },
+    [game.id],
+  )
+  const exitWhy = useCallback(() => {
+    setAnimate(false)
+    setWhy(null)
+  }, [])
+  const exitTry = useCallback(() => {
+    setAnimate(false)
+    setWhy(null)
+    setTrying(null)
   }, [])
 
   const step = useCallback(
@@ -109,6 +163,25 @@ export function ReviewView({ game, review, status, meta }: Props) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isTyping(event.target) || event.altKey || event.ctrlKey || event.metaKey) return
+      if (why) {
+        const replay: Partial<Record<string, () => void>> = {
+          ArrowLeft: player.prev,
+          ArrowRight: player.next,
+          ' ': player.toggle,
+          Escape: exitWhy,
+        }
+        const action = Object.hasOwn(replay, event.key) ? replay[event.key] : undefined
+        if (action) {
+          event.preventDefault()
+          action()
+        }
+        return
+      }
+      if (trying && event.key === 'Escape') {
+        event.preventDefault()
+        exitTry()
+        return
+      }
       const actions: Record<string, (() => void) | null> = {
         ArrowLeft: () => {
           step(-1)
@@ -140,10 +213,26 @@ export function ReviewView({ game, review, status, meta }: Props) {
     return () => {
       window.removeEventListener('keydown', onKey)
     }
-  }, [step, jump, last, goNextError, exploration])
+  }, [step, jump, last, goNextError, exploration, why, player, exitWhy, trying, exitTry])
 
   const onBoardMove = (uci: string) => {
     setAnimate(false) // the piece was already dragged
+    if (trying) {
+      if (trying.state.status !== 'waiting') return
+      const ply = trying.ply
+      setTrying({ ply, state: { status: 'checking', uci } })
+      analysisApi
+        .tryMove(game.id, ply, uci)
+        .then((result) => {
+          setTrying((t) => (t?.ply === ply ? { ply, state: { status: 'done', result } } : t))
+        })
+        .catch((error: unknown) => {
+          const message =
+            error instanceof ApiError ? error.message : 'No se ha podido comprobar la jugada.'
+          setTrying((t) => (t?.ply === ply ? { ply, state: { status: 'error', message } } : t))
+        })
+      return
+    }
     if (exploration) {
       const next = [...exploration.moves.slice(0, exploration.index), uci]
       setExploration({ ...exploration, moves: next, index: next.length })
@@ -219,6 +308,44 @@ export function ReviewView({ game, review, status, meta }: Props) {
       }
     }
   }
+  // Replaying a sequence or trying a move: the board shows that instead.
+  let boardFen = fen
+  let boardArrows = arrows
+  let boardMarks = marks
+  let boardMove = shownMove
+  let boardAnimate = animate
+  let interactive = true
+  let animationMs = 200
+  if (why) {
+    const data = why.data
+    const current = player.index >= 0 ? data.steps[player.index] : undefined
+    boardFen = current?.fen ?? data.start_fen
+    boardArrows = (current?.arrows ?? []).map((a) => ({
+      from: a.from_square,
+      to: a.to_square,
+      color: WHY_ARROW,
+    }))
+    boardMove = current ? { ...squares(current.uci), classification: null } : null
+    boardMarks = current?.consequence
+      ? [{ square: current.uci.slice(2, 4), role: data.tone === 'bad' ? 'danger' : 'good' }]
+      : []
+    boardAnimate = true
+    interactive = false
+    animationMs = Math.min(450, Math.round(data.step_ms * 0.45))
+  } else if (trying) {
+    const before = fens[trying.ply] ?? game.initial_fen
+    const attempt =
+      trying.state.status === 'checking'
+        ? trying.state.uci
+        : trying.state.status === 'done'
+          ? trying.state.result.uci
+          : null
+    boardFen = attempt ? fenAfter(before, [attempt]) : before
+    boardArrows = [] // the best move must not be given away
+    boardMarks = []
+    boardMove = attempt ? { ...squares(attempt), classification: null } : null
+    interactive = trying.state.status === 'waiting'
+  }
   const barEval = exploration ? (evaluation?.white ?? null) : (review?.evals[shownPosition] ?? null)
   const names = playerNames(game)
   const start = fenStart(game.initial_fen)
@@ -278,13 +405,15 @@ export function ReviewView({ game, review, status, meta }: Props) {
           />
           <div className="min-w-0 flex-1">
             <ReviewBoard
-              fen={fen}
+              fen={boardFen}
               orientation={orientation}
-              arrows={arrows}
-              marks={marks}
-              shownMove={shownMove}
-              animate={animate}
+              arrows={boardArrows}
+              marks={boardMarks}
+              shownMove={boardMove}
+              animate={boardAnimate}
               onMove={onBoardMove}
+              interactive={interactive}
+              animationMs={animationMs}
             />
           </div>
         </div>
@@ -303,9 +432,21 @@ export function ReviewView({ game, review, status, meta }: Props) {
           className="panel flex flex-col lg:absolute lg:inset-0"
         >
           <div className="order-first border-b border-line p-3 lg:order-last lg:border-t lg:border-b-0">
-            {nav}
+            {why ? (
+              <WhyBar
+                why={why.data}
+                player={player}
+                onExit={exitWhy}
+                onRef={(ref) => {
+                  exitTry()
+                  onRef(ref)
+                }}
+              />
+            ) : (
+              nav
+            )}
           </div>
-          <div className="p-3 pb-0">
+          <div className={`p-3 pb-0 ${why || trying ? 'opacity-50' : ''}`}>
             {review ? (
               <EvalGraph
                 evals={review.evals}
@@ -363,7 +504,35 @@ export function ReviewView({ game, review, status, meta }: Props) {
             )}
             {review && tab === 'review' && (
               <div className="shrink-0 lg:max-h-[68%] lg:overflow-y-auto">
-                {exploration && baseFen ? (
+                {why ? (
+                  <WhyPanel
+                    why={why.data}
+                    player={player}
+                    onExit={exitWhy}
+                    onRef={(ref) => {
+                      exitTry()
+                      onRef(ref)
+                    }}
+                  />
+                ) : trying ? (
+                  <TryIt
+                    state={trying.state}
+                    side={review.moves[trying.ply]?.color ?? 'white'}
+                    busy={whyLoading}
+                    onRetry={() => {
+                      setTrying({ ply: trying.ply, state: { status: 'waiting' } })
+                    }}
+                    onWhyAttempt={() => {
+                      if (trying.state.status === 'done' && trying.state.result.why) {
+                        setWhy({ data: trying.state.result.why, fromTry: true })
+                      }
+                    }}
+                    onSolution={() => {
+                      openWhy(trying.ply, 'solution', true)
+                    }}
+                    onExit={exitTry}
+                  />
+                ) : exploration && baseFen ? (
                   <ExplorationCard
                     base={
                       exploration.base === 0
@@ -404,12 +573,27 @@ export function ReviewView({ game, review, status, meta }: Props) {
                       setDeepAt(open ? position : null)
                     }}
                     onRef={onRef}
+                    onWhy={(kind) => {
+                      if (reviewed) openWhy(reviewed.ply, kind)
+                    }}
+                    onTry={() => {
+                      if (!reviewed) return
+                      setExploration(null)
+                      setAnimate(false)
+                      setTrying({ ply: reviewed.ply, state: { status: 'waiting' } })
+                    }}
+                    whyLoading={whyLoading}
+                    whyError={whyError?.ply === reviewed?.ply ? (whyError?.message ?? null) : null}
                   />
                 )}
               </div>
             )}
             {(!review || tab === 'review') && (
-              <div className="flex min-h-0 flex-1 flex-col border-t border-line pt-3">
+              <div
+                className={`flex min-h-0 flex-1 flex-col border-t border-line pt-3 ${
+                  why || trying ? 'opacity-50' : ''
+                }`}
+              >
                 <MoveList
                   moves={listMoves}
                   position={exploration ? exploration.base : position}

@@ -41,7 +41,7 @@ def find_ref(facts: MoveFacts, san: str) -> MoveRef | None:
 
 
 def invalid_marks(text: str, facts: MoveFacts) -> list[str]:
-    """Marks that are not moves of the facts' lines (an LLM inventing a move, Phase 5)."""
+    """Marks that are not moves of the facts' lines (e.g. a future AI inventing a move)."""
     return [san for san in extract_marks(text) if find_ref(facts, san) is None]
 
 

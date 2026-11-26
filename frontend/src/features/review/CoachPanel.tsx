@@ -1,10 +1,11 @@
-import { BookOpen, ChevronDown, ListTree } from 'lucide-react'
+import { BookOpen, ChevronDown, Lightbulb, ListTree, PlayCircle, Target } from 'lucide-react'
 import { useState } from 'react'
 import type { Explanation, MoveRef, MoveReview, WhiteEval } from '../../api/analysis'
 import { ClassBadge } from '../../components/ClassBadge'
 import { readFlag, writeFlag } from '../../lib/storage'
 import { CLASSIFICATIONS, evalLabel, moveNumber, showsAlternative } from './classification'
 import { MoveExplanation } from './MoveExplanation'
+import { canTry as canTryMove, whyKindOf } from './why/kinds'
 
 const DETAILS_KEY = 'whyfish.review.engineDetails'
 
@@ -20,6 +21,13 @@ interface Props {
   onDeep: (deep: boolean) => void
   /** A move of the explanation was clicked: show it on the board. */
   onRef: (ref: MoveRef) => void
+  /** "Ver por qué" (refutation) / "Ver la idea" (idea). */
+  onWhy: (kind: 'refutation' | 'idea') => void
+  /** "Pruébalo tú" on errors. */
+  onTry: () => void
+  /** The sequence is being prepared (the engine may extend it). */
+  whyLoading: boolean
+  whyError: string | null
 }
 
 /** SAN line with move numbers ("4… Nd7 5. exd6 Bxd6"); every move is clickable. */
@@ -69,6 +77,10 @@ export function CoachPanel({
   deep,
   onDeep,
   onRef,
+  onWhy,
+  onTry,
+  whyLoading,
+  whyError,
 }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(() => readFlag(DETAILS_KEY, false))
   const [lineOpen, setLineOpen] = useState(false)
@@ -86,6 +98,8 @@ export function CoachPanel({
   const meta = CLASSIFICATIONS[move.classification]
   const alternative = showsAlternative(move)
   const canDeepen = deep || Boolean(explanation?.text)
+  const whyKind = whyKindOf(move, explanation)
+  const canTry = canTryMove(move)
 
   return (
     <div className="flex flex-col gap-3">
@@ -107,9 +121,31 @@ export function CoachPanel({
         </p>
       )}
 
-      {/* Actions: "Profundizar" (level 2), "Ver línea"; "Pruébalo tú" comes in phase 6. */}
-      {(alternative || canDeepen) && (
+      {/* Actions: "Ver por qué" / "Ver la idea", "Pruébalo tú", "Profundizar", "Ver línea". */}
+      {(alternative || canDeepen || whyKind || canTry) && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Acciones">
+          {whyKind && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={whyLoading}
+              onClick={() => {
+                onWhy(whyKind)
+              }}
+            >
+              {whyKind === 'refutation' ? <PlayCircle size={16} /> : <Lightbulb size={16} />}
+              {whyLoading
+                ? 'Preparando…'
+                : whyKind === 'refutation'
+                  ? 'Ver por qué'
+                  : 'Ver la idea'}
+            </button>
+          )}
+          {canTry && (
+            <button type="button" className="btn" onClick={onTry}>
+              <Target size={16} /> Pruébalo tú
+            </button>
+          )}
           {canDeepen && (
             <button
               type="button"
@@ -136,6 +172,7 @@ export function CoachPanel({
           )}
         </div>
       )}
+      {whyError && <p className="text-sm text-[#f87171]">{whyError}</p>}
       {alternative && lineOpen && (
         <Line
           label="Línea de la mejor jugada"

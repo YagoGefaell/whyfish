@@ -7,7 +7,7 @@ const MARK = /\[\[([^[\]]+)\]\]/g
  * One paragraph of an explanation: text with every [[SAN]] mark turned into a clickable move.
  * `refs` are consumed in order (one per mark); `offset` is the index of the first mark.
  */
-function Paragraph({
+export function MarkedParagraph({
   text,
   refs,
   offset,
@@ -79,7 +79,7 @@ export function MoveExplanation({ explanation, loading, onRef }: Props) {
       className="flex flex-col gap-2 text-[15px] leading-relaxed"
     >
       {paragraphs.map((text, i) => (
-        <Paragraph
+        <MarkedParagraph
           key={i}
           text={text}
           refs={explanation.refs}

@@ -54,6 +54,7 @@ export default defineConfig({
         ANALYSIS_TIME_S: '0.05',
         EVALUATE_TIME_S: '0.1',
         BOT_MOVETIME_S: '0.05',
+        WHY_STEP_MS: '400',
       },
       url: `http://127.0.0.1:${String(BACKEND_PORT)}/api/health`,
       reuseExistingServer: false,

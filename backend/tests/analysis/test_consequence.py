@@ -56,3 +56,20 @@ def test_the_point_is_where_the_material_settles() -> None:
 def test_promotion() -> None:
     c = cons("8/P6k/8/8/8/8/8/K7 w - - 0 1", "a7a8q h7g6")
     assert c.kind == "material" and c.ply == 0 and c.promoted == ("queen",) and c.material == 8
+
+
+def test_later_small_trades_do_not_move_the_point() -> None:
+    from app.analysis.consequence import _point
+
+    # 21...dxc3?? (+3) Rxd8 (-6, recapture pending) Raxd8 (-1): the queen for rook and knight.
+    # gxh6 (-2) and then pawns come and go (-2, -3, -2): a two-pawn swing needs the exact
+    # balance, so the story ends at gxh6, not at the last pawn of the line.
+    values = [3, -6, -1, -2, -2, -3, -2, -2]
+    quiet = [True, False, True, True, True, True, True, True]
+    assert _point(values, quiet, start=0, final=-2) == 3
+    # With a piece-sized swing a pawn of tolerance: the knight is lost at ply 1.
+    assert _point([0, -3, -2, -3, -4], [True, True, True, True, True], start=0, final=-4) == 1
+    # A one-pawn swing needs the exact balance, and is not reached at the start.
+    assert _point([0, -1, -1], [True, True, True], start=0, final=-1) == 1
+    # The loss is won back later (more than a pawn): the point moves on.
+    assert _point([-3, 0, -3], [True, True, True], start=0, final=-3) == 2

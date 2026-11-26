@@ -5,10 +5,11 @@ Shared by the level-1 text and "Ver por qué" (Phase 5), so both tell the same s
 Given the position before a move and a line starting with it:
 - **mate:** the line reaches checkmate -> the mating ply;
 - **material:** the material changes and settles: the first QUIET position (no profitable
-  capture pending for the side to move, by quiescence) from which the material no longer
-  changes at any later quiet position of the line. It is never in the middle of an exchange:
-  if the queen is taken and recaptured, the point is the recapture. Promotions count as
-  material;
+  capture pending for the side to move, by quiescence) whose material already is the final
+  balance (within a pawn when the swing is at least a piece) and from which the losing side
+  never wins back more than that. It is never in the middle of an exchange: if the queen is
+  taken and recaptured, the point is the recapture; later small trades do not move it.
+  Promotions count as material;
 - **none:** the material at the end is the same as at the start.
 
 If the line ends before the position is quiet, the remaining captures are resolved by
@@ -91,17 +92,27 @@ def consequence(
     final = end_static if end_quiet else end_resolved
     if final == start:
         return Consequence("none", None, 0, (), (), (), (), False, end_quiet)
-    point: int | None = None
-    for i in range(len(values) - 1, -1, -1):
-        if quiet[i] and values[i] != final:
-            break
-        if quiet[i]:
-            point = i
+    point = _point(values, quiet, start, final)
     if point is None:
         return _result("material", None, mover, events, False, material_=final - start)
-    # Settled at `point` even if the line ends in the middle of a later (even) exchange: the
-    # material at every quiet position from there on, and after resolving the end, is `final`.
+    # Settled at `point` even if the line goes on with smaller trades or ends in the middle of
+    # a later (even) exchange.
     return _result("material", point, mover, events[: point + 1], True)
+
+
+def _point(values: list[int], quiet: list[bool], start: int, final: int) -> int | None:
+    """First quiet ply whose material already is the final balance (within one pawn when the
+    swing is at least a piece) and from which the losing side never wins back more than that
+    tolerance. Later small trades do not move the story's end."""
+    direction = 1 if final > start else -1
+    tolerance = 1 if abs(final - start) >= 3 else 0
+    for i, value in enumerate(values):
+        if not quiet[i] or (value - start) * direction <= 0 or abs(value - final) > tolerance:
+            continue
+        later = [values[j] for j in range(i + 1, len(values)) if quiet[j]]
+        if all((v - value) * -direction <= tolerance for v in later):
+            return i
+    return None
 
 
 def _captured_type(board: chess.Board, move: chess.Move) -> chess.PieceType | None:
