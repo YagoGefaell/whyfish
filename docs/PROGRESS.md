@@ -164,11 +164,12 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - **API:** `GET /api/games/{id}/moves/{ply}/explanation?level=1|2`.
 - **Frontend:** texto con jugadas clicables (se muestran en el tablero como variante, o se salta
   a la jugada si es de la partida), "Profundizar", flechas roja/ámbar y casillas marcadas.
-- **Informe:** muestra fija de 20 (regla en `explain/report.py`), 19 de las partidas del usuario,
+- **Informe:** muestra fija de 20 (regla en `explain/report.py`), regenerado el 2026-11-26 tras
+  corregir los sacrificios: 20 de 20 de las 6 partidas del usuario,
   con diagrama, textos y hechos usados marcados. Las partidas del usuario se leyeron de
   `data/whyfish.db` en solo lectura (SHA-1 comprobado antes y después) y se analizaron en una base
   temporal.
-- **Tests:** backend 274 (29 de detectores, 37 de explicaciones, API, informe), frontend 45, e2e
+- **Tests:** backend 291 (detectores, sacrificio, explicaciones, API, informe), frontend 45, e2e
   con captura `*-review-explanation.png`.
 
 ## Pendiente / siguiente paso
