@@ -163,8 +163,12 @@ class TestBrilliant:
 
     def test_slightly_worse_but_balanced_result_is_enough(self) -> None:
         # -20 cp = 48.2% >= 45
-        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5", -20), ("d4e2", -40))))
+        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5 g6f5", -20), ("d4e2", -40))))
         assert verdict.classification is C.BRILLIANT
+
+    def test_not_when_no_engine_line_shows_the_capture(self) -> None:
+        verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4f5 g8h8", -20), ("d4e2", -40))))
+        assert verdict.classification is C.BEST
 
     def test_not_when_it_loses_win_percentage(self) -> None:
         verdict = classify(inp(KNIGHT_SAC, "d4f5", ev(("d4e2", 50), ("d4f5", 0))))

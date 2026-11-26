@@ -280,28 +280,26 @@ def level1(
             return text
 
         case K.SACRIFICE:
-            assert pl is not None
-            me = mt.move(pl, 0)
-            offered = idea.piece
-            outcome = _sacrifice_outcome(facts, pl, t)
-            if offered is not None and idea.index is not None:
-                takes = f"{mt.move(pl, idea.index)} {es.pronoun(offered)} captura"
-                return f"{me} entrega {es.the(offered)}: si {takes}, {outcome}."
-            if offered is not None:
-                attacked = es.agree(offered, "atacado")
+            # Backed by facts.sacrifice: a legal capture with favourable SEE for the opponent,
+            # evaluated in the engine line `sacrifice_line` (or bounded by the MultiPV).
+            line, sac = facts.sacrifice_line, facts.sacrifice
+            assert line is not None and sac is not None and idea.piece is not None
+            me = mt.move(line, 0)
+            takes = f"{mt.move(line, 1)} {es.pronoun(idea.piece)} captura"
+            if sac.bound:
+                pl = facts.played_line
+                if pl is not None and len(pl.sans) > 1:
+                    reply = mt.move(pl, 1)
+                    return (
+                        f"{me} entrega {es.the(idea.piece)}: si {takes}, al rival le va peor "
+                        f"que con su mejor respuesta, {reply}."
+                    )
                 return (
-                    f"{me} deja {es.the(offered)} {attacked} a propósito: "
-                    f"tomar{es.pronoun(offered)} no le conviene al rival."
+                    f"{me} entrega {es.the(idea.piece)}, pero "
+                    f"tomar{es.pronoun(idea.piece)} no le conviene al rival."
                 )
-            assert facts.sacrifice is not None
-            if facts.sacrifice.line_end > facts.sacrifice.after_move and len(pl.sans) > 1:
-                # Lost right after the move, but the engine's reply does not take it.
-                return (
-                    f"{me} ofrece {es.material(idea.gain)}, pero aceptarlo no le conviene "
-                    f"al rival: su mejor respuesta es {mt.move(pl, 1)}."
-                )
-            rest = " ".join(mt.moves(pl, 1, t.commented_line_plies))
-            return f"{me} entrega {es.material(idea.gain)}: tras {rest}, {outcome}."
+            outcome = _sacrifice_outcome(facts, line, t)
+            return f"{me} entrega {es.the(idea.piece)}: si {takes}, {outcome}."
 
         case K.WINS_MATERIAL:
             assert pl is not None
@@ -379,17 +377,18 @@ def _only_move_consequence(
 
 
 def _sacrifice_outcome(facts: MoveFacts, line: LineOutcome, t: FactThresholds) -> str:
-    """Only `facts.sacrifice` (resolved material) may back "material de menos"."""
-    assert facts.sacrifice is not None
+    """From the verifying line: its mate / resolved material / evaluation."""
+    sac = facts.sacrifice
+    assert sac is not None
     if line.mate is not None and line.mate > 0:
         return "llega un ataque de mate"
-    if facts.sacrifice.line_end > 0:
+    if sac.line_end is not None and sac.line_end > 0:
         return "se recupera el material con creces"
-    if facts.sacrifice.line_end == 0:
+    if sac.line_end == 0:
         return "se recupera el material"
-    if facts.win_after >= THRESHOLDS.winning_above:
+    if sac.win >= THRESHOLDS.winning_above:
         return "la posición queda ganadora pese al material de menos"
-    if facts.win_after >= 55:
+    if sac.win >= 55:
         return "la posición es buena pese al material de menos"
     return "la posición se mantiene equilibrada pese al material de menos"
 

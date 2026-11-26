@@ -300,6 +300,7 @@ def _facts_table(item: Item) -> str:
         ("best_line", "(es la jugada hecha)" if f.is_best else _line(f.best_line)),
         ("second_line", _line(f.second_line) if f.second_line else ""),
         ("sacrifice", _sacrifice(f.sacrifice)),
+        ("sacrifice_line", _line(f.sacrifice_line) if f.sacrifice_line else ""),
         *_effects_rows("played", f.played),
         *_effects_rows("best", f.best),
     ]
@@ -322,10 +323,9 @@ def _facts_table(item: Item) -> str:
 def _sacrifice(s: Sacrifice | None) -> str:
     if s is None:
         return ""
-    return (
-        f"entrega {s.amount} (material resuelto: referencia {s.reference:+d}, "
-        f"tras la jugada {s.after_move:+d}, al final de la línea {s.line_end:+d})"
-    )
+    how = "cota del MultiPV" if s.bound else f"línea {' '.join(s.line[:4])}…"
+    end = "" if s.line_end is None else f"; material al final {s.line_end:+d}"
+    return f"pieza de {s.square}, el rival gana {s.amount} (SEE); {how} ({s.win:.0f} %){end}"
 
 
 def _diagnosis(item: Item) -> str:

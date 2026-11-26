@@ -257,13 +257,16 @@ explicaciones por plantilla): leer SPEC + ROADMAP + este archivo y proponer el p
 - Nivel **"Personalizado"** con selector de Elo (1320–3190, rango de `UCI_Elo` en Stockfish 19).
 
 ## Deuda técnica / dudas abiertas
-- **Corregido (2026-11-26): brillantes falsos.** 8.Bd2 en jaque (partida 6) y 5… Bd6 (partida 1)
-  salían !!. El sacrificio se mide ahora con material resuelto por quiescencia y exige una
-  alternativa que conserve el material (`app/analysis/sacrifice.py`, SPEC §3.1). Las !! que quedan
-  en el fixture de Kasparov (25.Re7+, 26.Qxd4+, 28.Qc3, 29.Ra7, 30.Rxb7, 36.Bf1, 37.Rd7) y en
-  Fischer (14…Qb6, 15…Nxc3) son piezas realmente ofrecidas dentro de la combinación, pero la
-  tradición solo da !! a 24.Rxd4 y 17…Be6/11…Na4. Pendiente de decisión del usuario: ¿limitar a
-  una !! por combinación (p. ej. no repetir si la jugada anterior propia ya fue !!)?
+- **Corregido (2026-11-26): brillantes falsos.** 8.Bd2 en jaque, 21.Nd6 (pieza "atacada" solo
+  por el rey, defendida) y 27.Ke1 (partida 6) y 5… Bd6 (partida 1) salían !!. Sacrificio = captura
+  legal con SEE favorable al rival + material resuelto por quiescencia + alternativa que lo
+  conserva + verificación con las líneas del motor (o cota del MultiPV). Ver SPEC §3.1.
+  Recuento tras el cambio: tus partidas !! 0 / ! 9 (8 en la partida 6); fixtures !! 11 / ! 40.
+- **Pendiente de decisión: una !! por combinación.** Kasparov–Topalov conserva 7 !! (24, 25, 26,
+  28, 30, 36, 37) y Byrne–Fischer 4 (11…Na4, 14…Qb6, 15…Nxc3, 17…Be6). Propuesta: no es !! si
+  el jugador ya iba por debajo en material resuelto (continúa una combinación propia); dejaría
+  24.Rxd4, 37.Rd7 y las 4 de Fischer.
+- **"!" generosa:** 8 grandes jugadas en una partida contra Novato; revisar umbrales de §3.2.
 - Explicaciones genéricas en ?! posicionales sin hechos (el informe las marca "faltan hechos").
 - Desviación, sobrecarga y rayos X sin detectar (SPEC §4).
 - Elo de Principiante/Novato aproximado y sin calibrar.

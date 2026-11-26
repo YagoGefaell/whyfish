@@ -96,20 +96,25 @@ umbrales de Δ** (Excelente, Buena, Imprecisión, Error, Grave error). Gana la p
 ### 3.1 Brillante (!!)
 Todas deben cumplirse:
 1. Es la mejor jugada o casi (Δ < 2).
-2. Implica un **sacrificio real** (`app/analysis/sacrifice.py`, compartido con los hechos):
-   - **Material de referencia:** el balance antes de la jugada con los cambios pendientes
-     resueltos (quiescencia: capturas, promociones y, en jaque, todas las evasiones;
-     profundidad configurable). Nunca el balance a mitad de un intercambio.
-   - La jugada pierde ≥ 2 puntos respecto a esa referencia en alguna de estas formas:
-     - **en prise:** resolviendo las capturas justo después de la jugada (cualquier pieza
-       propia, no solo la movida; p. ej. Byrne–Fischer 1956, 17…Be6!!, que deja la dama en b6);
-     - **en la variante:** resuelto tras un horizonte corto de la variante jugada (extendido
-       mientras haya capturas) **y también al final de la variante completa** (una combinación
-       cortada a medias no es sacrificio).
-   - **Hay alternativa:** alguna otra jugada legal conserva ese material (misma medida). Si
-     todas lo pierden —p. ej. en jaque con una pieza que no se puede salvar— no es sacrificio
-     (regresión: 1.e3 d5 2.d4 Nf6 3.Nf3 Bf5 4.c4 e6 5.cxd5 Nxd5 6.Bd3 Bg6 7.Bxg6 Bb4+
-     8.Bd2 no es !!).
+2. Implica un **sacrificio real** (`app/analysis/sacrifice.py`, compartido con los hechos).
+   Todo esto debe cumplirse:
+   - **En prise de verdad:** tras la jugada el rival tiene una captura **legal** de una pieza
+     propia cuyo SEE le gana ≥ 2 puntos (descontando lo que capturó la jugada). "Atacada" sin
+     ganancia no cuenta (p. ej. un rey que solo puede tomar una pieza defendida: la captura
+     sería ilegal). Regresión: 21.Nd6 de la partida contra Novato no es !!.
+   - **Material de referencia resuelto:** el balance antes de la jugada con los cambios
+     pendientes resueltos (quiescencia: capturas, promociones y, en jaque, todas las
+     evasiones; profundidad configurable), nunca a mitad de un intercambio. La jugada pierde
+     ≥ 2 puntos respecto a él al resolver las capturas tras la jugada.
+   - **Hay alternativa:** alguna otra jugada legal conserva ese material. Si todas lo pierden
+     —p. ej. en jaque con una pieza que no se puede salvar— no es sacrificio (regresión:
+     8.Bd2 tras 7.Bxg6 Bb4+).
+   - **Verificado con el motor:** cada captura legal de esa pieza deja al jugador con win%
+     ≥ 45. La evaluación sale de la línea del motor donde se juega la captura (la línea de la
+     jugada en el MultiPV previo, o una línea del MultiPV del rival tras la jugada). Si la
+     captura no está en el MultiPV del rival (≥ 2 líneas), es peor para él que la última línea
+     listada, cuya evaluación sirve de cota (Kasparov 24.Rxd4!!: el motor prefiere …Kb6).
+     Si alguna captura no se puede comprobar, no es !!.
 3. La posición **no** estaba ya totalmente ganada antes (win% previo < 90).
 4. La posición resultante es al menos igualada para el jugador (win% posterior ≥ 45,
    configurable; p. ej. Kasparov–Topalov 1999, 24.Rxd4!!, ≈ 46 %).
@@ -176,14 +181,14 @@ Reglas para no afirmar de más (Fase 4):
 - Doble ataque y clavada exigen que la pieza que ataca no se pueda ganar (SEE).
 - Las amenazas nuevas de una jugada son las de la pieza movida o descubiertas por ella, y no se
   calculan si se respondía a un jaque.
-- "Entrega", "sacrifica" o "material de menos" solo si existe el hecho `sacrifice` (misma medida
-  que la clasificación de §3.1, con material resuelto). "Material de menos" exige además que el
-  balance resuelto al final de la variante siga por debajo de la referencia; si no, «se
-  recupera el material». La pieza entregada solo se nombra si la línea muestra su captura
-  inmediata o si quedó en prise y eso explica por sí solo el sacrificio; si no, se habla de
-  «material» sin nombrar pieza. Una pieza que no se podía salvar con ninguna jugada (p. ej.
-  estando en jaque) nunca es «dejada sin defensa» (el hecho `hanging` comprueba las
-  alternativas también en jaque).
+- "Entrega", "sacrifica" o "material de menos" solo si existe el hecho `sacrifice` (la misma
+  comprobación que §3.1: captura legal con SEE favorable al rival, verificada con el motor).
+  El texto siempre nombra esa captura: «[[X]] entrega el caballo de f5: si [[gxf5]] lo
+  captura, …». "Material de menos" exige que el balance resuelto al final de esa línea siga
+  por debajo de la referencia; si no, «se recupera el material». Si la captura solo está
+  acotada por el MultiPV: «…al rival le va peor que con su mejor respuesta, [[Y]]». Nunca
+  «deja X atacado» sin captura legal favorable. Una pieza que no se podía salvar con ninguna
+  jugada (p. ej. en jaque) nunca es «dejada sin defensa».
 
 ## 5. Explicaciones (`explain/`)
 

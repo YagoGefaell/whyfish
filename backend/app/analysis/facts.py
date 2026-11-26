@@ -80,10 +80,11 @@ class MoveFacts:
     played_line: LineOutcome | None  # the played move, then the opponent's best reply...
     best_line: LineOutcome | None
     second_line: LineOutcome | None  # when the played move is the best: the next option
-    # Material given up for nothing forced, measured with resolved exchanges (the same check
-    # as the brilliant classification). Templates may only say "entrega" / "material de menos"
-    # from this.
+    # A piece given up (legal capture with favourable SEE for the opponent, not forced,
+    # verified by an engine line where it is taken): the same check as the brilliant
+    # classification. Templates may only say "entrega" / "material de menos" from this.
     sacrifice: Sacrifice | None
+    sacrifice_line: LineOutcome | None  # the verifying line (named "played": it starts with it)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -178,6 +179,12 @@ def build_move_facts(
             best_effects = move_effects(board, best_move, t)
 
     played_line = _played_line(board, move, before, after, ply, t)
+    sacrifice = find_sacrifice(board, move, before, after)
+    sacrifice_line = None
+    if sacrifice is not None:
+        sacrifice_line = line_outcome(
+            "played", board, sacrifice.line, sacrifice.cp, sacrifice.mate, ply, t
+        )
     return MoveFacts(
         ply=ply,
         color="white" if board.turn == chess.WHITE else "black",
@@ -201,5 +208,6 @@ def build_move_facts(
         played_line=played_line,
         best_line=best_line,
         second_line=second_line,
-        sacrifice=find_sacrifice(board, move, played_line.ucis),
+        sacrifice=sacrifice,
+        sacrifice_line=sacrifice_line,
     )

@@ -19,13 +19,13 @@ from typing import Literal
 
 import chess
 
-from app.analysis.detectors.common import PieceOn, piece_on
+from app.analysis.detectors.common import PieceOn, piece_on, require_piece
 from app.analysis.detectors.lines import LineOutcome
 from app.analysis.detectors.motifs import Motif
 from app.analysis.detectors.threats import Parried, Threat
 from app.analysis.facts import MoveFacts
 from app.analysis.types import Classification
-from app.config import FACTS, THRESHOLDS, FactThresholds
+from app.config import FACTS, FactThresholds
 
 C = Classification
 ERRORS = (C.INACCURACY, C.MISTAKE, C.BLUNDER, C.MISS)
@@ -406,31 +406,22 @@ def _only_move(facts: MoveFacts, t: FactThresholds) -> Idea | None:
 
 
 def _sacrifice(facts: MoveFacts, t: FactThresholds) -> Idea | None:
-    """Only from `facts.sacrifice` (resolved material, some other move kept it).
-
-    The piece is named only when the facts show it: the opponent captures it right away in
-    the line (`index`), or it is left en prise and that alone accounts for the sacrifice.
-    Otherwise (the material goes later in the line) no piece is named.
-    """
-    pl, sac = facts.played_line, facts.sacrifice
-    if pl is None or sac is None:
+    """Only from `facts.sacrifice`: a legal capture with favourable SEE for the opponent,
+    verified by the engine line where it is taken (`facts.sacrifice_line`, ply 1)."""
+    sac, line = facts.sacrifice, facts.sacrifice_line
+    if sac is None or line is None or len(line.sans) < 2:
         return None
-    minimum = THRESHOLDS.sacrifice_min_material
-    used = ["sacrifice", "played_line"]
-    piece: PieceOn | None = None
-    index: int | None = None
-    first = next((c for c in pl.captures if c.index == 1), None)
-    if first is not None and first.captured.value >= minimum:
-        piece, index = first.captured, 1
-    elif facts.played.hanging:
-        top = facts.played.hanging[0]
-        if top.loss >= minimum and sac.after_move <= -minimum:
-            piece = top.piece
-            used.append("played.hanging")
-    anns: list[Annotation] = [square(piece.square, "danger")] if piece else []
+    after = chess.Board(facts.fen_after)
+    piece = require_piece(after, chess.parse_square(sac.square))
+    anns: list[Annotation] = [square(piece.square, "danger")]
     anns += [arrow(th.attackers[0], th.target.square, "attack") for th in facts.played.threats[:2]]
     return Idea(
-        IdeaKind.SACRIFICE, tuple(used), tuple(anns), piece=piece, index=index, gain=sac.amount
+        IdeaKind.SACRIFICE,
+        ("sacrifice", "sacrifice_line"),
+        tuple(anns),
+        piece=piece,
+        index=1,
+        gain=sac.amount,
     )
 
 

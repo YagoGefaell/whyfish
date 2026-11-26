@@ -31,6 +31,22 @@ class TestSee:
         board = chess.Board("3rk3/8/8/3n4/8/8/3R4/3RK3 w - - 0 1")
         assert material.see(board, chess.D5) == 3
 
+    def test_king_cannot_take_a_defended_piece(self) -> None:
+        # 21.Nd6: the black king attacks d6, but the rook on d1 defends it (Kxd6 is illegal).
+        board = chess.Board("r2n4/pp1nkpp1/3Np1p1/6N1/8/P3P3/1P2KPPP/3R4 b - - 3 21")
+        assert material.see(board, chess.D6) == 0
+
+    def test_king_takes_an_undefended_piece(self) -> None:
+        board = chess.Board("r2n4/pp1nkpp1/3Np1p1/6N1/8/P3P3/1P2KPPP/8 b - - 3 21")
+        assert material.see(board, chess.D6) == 3
+
+    def test_king_recaptures_only_if_legal(self) -> None:
+        # Rxd5: the king may recapture on d5 only if no white piece defends it afterwards.
+        free = chess.Board("8/8/4k3/3n4/8/8/8/3RK3 w - - 0 1")
+        assert material.see(free, chess.D5) == 0  # Rxd5 Kxd5: rook for knight, not worth it
+        guarded = chess.Board("8/8/4k3/3n4/2P5/8/8/3RK3 w - - 0 1")
+        assert material.see(guarded, chess.D5) == 3  # Rxd5 and Kxd5 is illegal (c4 pawn)
+
 
 class TestLeftEnPrise:
     def test_moving_piece_into_pawn_attack(self) -> None:

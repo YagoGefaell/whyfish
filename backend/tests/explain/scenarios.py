@@ -208,6 +208,17 @@ def knight_sacrifice() -> MoveFacts:
     )
 
 
+def declined_knight_sacrifice() -> MoveFacts:
+    """Nf5!!, declined: taking is not even among the opponent's lines (MultiPV bound)."""
+    return make_facts(
+        KNIGHT_SAC,
+        "d4f5",
+        [line("d4f5", "g8h8", cp=50), line("d4e2", cp=40)],
+        [line("g8h8", cp=-50), line("h7h5", cp=-60), line("f7f6", cp=-80)],
+        C.BRILLIANT,
+    )
+
+
 BD2_IN_CHECK = "rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8"
 
 
@@ -235,5 +246,6 @@ ALL = [
     good_a3,
     recapture,
     knight_sacrifice,
+    declined_knight_sacrifice,
     forced_loss_labelled_brilliant,
 ]

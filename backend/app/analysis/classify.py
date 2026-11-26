@@ -142,13 +142,4 @@ def is_great(before: PositionEval, t: ClassificationThresholds) -> bool:
 
 def is_sacrifice(inp: MoveInput, t: ClassificationThresholds) -> bool:
     """SPEC §3.1.2: see `app.analysis.sacrifice`."""
-    return find_sacrifice(inp.board, inp.move, played_line(inp), t) is not None
-
-
-def played_line(inp: MoveInput) -> tuple[str, ...]:
-    uci = inp.move.uci()
-    for line in inp.before.lines:
-        if line.move == uci:
-            return line.moves
-    reply = inp.after.lines[0].moves if inp.after.lines else ()
-    return (uci, *reply)
+    return find_sacrifice(inp.board, inp.move, inp.before, inp.after, t) is not None

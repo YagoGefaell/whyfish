@@ -171,7 +171,7 @@
     },
     {
       "id": "whyfish-8-bd2",
-      "pgn": "whyfish_bd2_in_check.pgn",
+      "pgn": "whyfish_novice_2026.pgn",
       "ply": 14,
       "expected": "best",
       "source": {
@@ -180,6 +180,18 @@
         "move": "8.Bd2"
       },
       "note": "Regression: 7.Bxg6 starts an exchange, 7...Bb4+ is an in-between check and 8...hxg6 restores material balance. No legal move saves the g6 bishop, so 8.Bd2 is not a sacrifice (was wrongly !!). Best move; the second option (Nc3) is less than 10 points worse, so not !."
+    },
+    {
+      "id": "whyfish-21-nd6",
+      "pgn": "whyfish_novice_2026.pgn",
+      "ply": 40,
+      "expected": "excellent",
+      "source": {
+        "game": "User vs Stockfish Novato (whyfish)",
+        "year": 2026,
+        "move": "21.Nd6"
+      },
+      "note": "Regression: the d6 knight is attacked only by the king on e7 and defended by the d1 rook (Kxd6 is illegal): not en prise, not a sacrifice (was wrongly !!). Δ ≈ 1.9 at depth 16: excellent."
     }
   ]
 }

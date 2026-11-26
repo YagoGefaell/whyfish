@@ -27,7 +27,8 @@ def extract_marks(text: str) -> list[str]:
 
 
 def fact_lines(facts: MoveFacts) -> list[LineOutcome]:
-    return [ln for ln in (facts.played_line, facts.best_line, facts.second_line) if ln]
+    lines = (facts.played_line, facts.best_line, facts.second_line, facts.sacrifice_line)
+    return [ln for ln in lines if ln]
 
 
 def find_ref(facts: MoveFacts, san: str) -> MoveRef | None:
