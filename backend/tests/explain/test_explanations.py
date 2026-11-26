@@ -32,6 +32,7 @@ LEVEL1 = {
         "[[Nf5]] entrega el caballo de f5: si [[gxf5]] lo captura, la posición se mantiene "
         "equilibrada pese al material de menos."
     ),
+    s.nd6_excellent: "Muy buena jugada; [[f4]] era algo más precisa.",
     s.declined_knight_sacrifice: (
         "[[Nf5]] entrega el caballo de f5: si [[gxf5]] lo captura, al rival le va peor que con "
         "su mejor respuesta, [[Kh8]]."

@@ -219,6 +219,40 @@ def declined_knight_sacrifice() -> MoveFacts:
     )
 
 
+NOVICE_21 = "r2n4/pp1nkpp1/4p1p1/1N4N1/8/P3P3/1P2KPPP/3R4 w - - 2 21"
+
+
+def nd6_excellent() -> MoveFacts:
+    """21.Nd6 (user game, evaluations as stored): f4 was slightly better but wins nothing."""
+    return make_facts(
+        NOVICE_21,
+        "b5d6",
+        [
+            line(
+                *[
+                    "f2f4",
+                    "f7f6",
+                    "g5f3",
+                    "d8c6",
+                    "b5d6",
+                    "a8d8",
+                    "b2b4",
+                    "b7b6",
+                    "d6b5",
+                    "d8c8",
+                    "d1d2",
+                    "d7f8",
+                ],
+                cp=20,
+            ),
+            line(*["d1c1", "f7f6", "g5e4", "a7a6", "b5d4", "f6f5", "e4g5", "e6e5"], cp=16),
+            line("g5f3", "d8c6", cp=12),
+        ],
+        [line(*["d7b6", "g5f3", "f7f6", "f3h4", "b6d5", "h4g6", "e7d6", "e3e4"], cp=-5)],
+        C.EXCELLENT,
+    )
+
+
 BD2_IN_CHECK = "rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8"
 
 
@@ -246,6 +280,7 @@ ALL = [
     good_a3,
     recapture,
     knight_sacrifice,
+    nd6_excellent,
     declined_knight_sacrifice,
     forced_loss_labelled_brilliant,
 ]

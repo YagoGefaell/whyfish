@@ -370,11 +370,9 @@ def _slightly_worse(facts: MoveFacts, t: FactThresholds) -> Idea | None:
     if facts.best is None or facts.best_line is None:
         return None
     pl, bl = facts.played_line, facts.best_line
-    if (
-        pl is not None
-        and bl.material - pl.material >= t.material_min
-        and bl.material >= t.material_min
-    ):
+    # Same rule as every gain claim: the best line must show the gain (a capture within the
+    # plies the text shows, not only the SEE settlement at its end) and the evaluation back it.
+    if pl is not None and bl.material - pl.material >= t.material_min and visible_gain(bl, t):
         return Idea(
             IdeaKind.SLIGHTLY_WORSE,
             ("best_line.material", "best_line", "played_line"),
