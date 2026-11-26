@@ -118,6 +118,7 @@ describe('TryIt', () => {
     san: 'g4',
     classification: 'blunder',
     correct: false,
+    also: [],
     why: WHY,
   }
   const noop = () => undefined
@@ -155,5 +156,23 @@ describe('TryIt', () => {
       />,
     )
     expect(screen.getByText(/¡Bien visto!/)).toHaveTextContent('e3 es la mejor jugada')
+  })
+
+  it('an equally good move is a hit too, naming the other one', () => {
+    render(
+      <TryIt
+        state={{
+          status: 'done',
+          result: { ...failed, san: 'Nf3', correct: true, also: ['e3'], why: null },
+        }}
+        side="white"
+        busy={false}
+        onRetry={noop}
+        onWhyAttempt={noop}
+        onSolution={noop}
+        onExit={noop}
+      />,
+    )
+    expect(screen.getByText(/¡Bien visto!/)).toHaveTextContent('También valía e3.')
   })
 })

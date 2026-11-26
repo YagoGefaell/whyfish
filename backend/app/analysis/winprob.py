@@ -74,3 +74,20 @@ def game_accuracy(accuracies: Sequence[float], weights: Sequence[float]) -> floa
     # Harmonic mean; accuracies are floored at 1 so a single 0 doesn't make it undefined.
     harmonic = len(accuracies) / sum(1 / max(a, 1.0) for a in accuracies)
     return (weighted + harmonic) / 2
+
+
+# Centipawn-equivalent of a mate, so that mates compare with scores and with each other.
+MATE_SCORE = 100_000
+
+
+def line_score(line: EngineLine) -> int:
+    """Score of a line for the side to move in centipawns; mate in n = ±(MATE_SCORE - 10 n)."""
+    return score(line.cp, line.mate)
+
+
+def score(cp: int | None, mate: int | None) -> int:
+    if mate is not None:
+        return MATE_SCORE - 10 * mate if mate > 0 else -MATE_SCORE - 10 * mate
+    if cp is None:
+        raise ValueError("score needs cp or mate")
+    return cp

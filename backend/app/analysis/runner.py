@@ -113,6 +113,40 @@ class AnalysisService:
 
     # --- Queries ----------------------------------------------------------
 
+    def cached_lines(self, board: chess.Board) -> tuple[EngineLine, ...] | None:
+        """Lines of the game analysis for `board` (SPEC §5.4, coherence between analyses):
+        the position itself, or the stored line of its parent that starts with the last move
+        (then seen from the new side to move). None if the analysis never saw it."""
+        name = self._engine_name()
+        if name is None:
+            return None
+        key = settings_key(name, self._settings)
+        own = self._stored(board, key)
+        if own is not None:
+            return own
+        if not board.move_stack:
+            return None
+        parent = board.copy()
+        last = parent.pop().uci()
+        for line in self._stored(parent, key) or ():
+            if line.move == last and len(line.moves) > 1:
+                cp = -line.cp if line.cp is not None else None
+                mate = -line.mate if line.mate is not None else None
+                return (EngineLine(moves=line.moves[1:], cp=cp, mate=mate),)
+        return None
+
+    def _stored(self, board: chess.Board, key: str) -> tuple[EngineLine, ...] | None:
+        # Matched by position (pieces, side to move, castling, en passant), not by history.
+        prefix = " ".join(board.fen().split()[:4]) + " "
+        with Session(self._db) as session:
+            row = session.exec(
+                select(PositionAnalysis).where(
+                    PositionAnalysis.settings_key == key,
+                    col(PositionAnalysis.fen).startswith(prefix),
+                )
+            ).first()
+        return lines_from_json(row.lines_json) if row is not None else None
+
     async def extend(
         self,
         board: chess.Board,

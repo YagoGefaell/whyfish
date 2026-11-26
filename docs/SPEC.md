@@ -85,13 +85,30 @@ umbrales de Δ** (Excelente, Buena, Imprecisión, Error, Grave error). Gana la p
 | 📖      | Teoría      | La posición resultante está en el libro de aperturas (dataset `lichess-org/chess-openings`) **y Δ < 10**; si no, se clasifica normalmente (el libro contiene trampas como "Barnes Opening: Fool's Mate"). |
 | !!      | Brillante   | Ver 3.1.                                                                       |
 | !       | Gran jugada | Ver 3.2.                                                                       |
-| ★       | Mejor       | Es la jugada nº 1 del motor (o Δ ≈ 0).                                         |
+| ★       | Mejor       | Es la jugada nº 1 del motor o **igual de buena** (ver «Igual de buenas»).      |
 | —       | Excelente   | Δ < 2                                                                          |
 | —       | Buena       | Δ < 5                                                                          |
 | ?!      | Imprecisión | Δ < 10                                                                         |
 | ?       | Error       | Δ < 20                                                                         |
 | ??      | Grave error | Δ ≥ 20                                                                         |
 | ✗       | Oportunidad perdida | El rival acababa de cometer un error/grave error y la jugada no lo castiga (Δ respecto a la mejor ≥ 10 y la mejor habría ganado ventaja decisiva). |
+
+**Igual de buenas.** Una jugada del MultiPV a Δ < 1 (`equal_max_delta`) de la mejor es igual
+de buena: es ★ si se juega, y el panel la nombra («[[X]] es la mejor. También valía [[Y]]»; en
+jugadas no-mejores, «La mejor era [[X]] (o [[Y]], igual de buena)»).
+
+**Posiciones decididas** (win% de quien mueve > 85 o < 15). El win% se satura (≈ 97,5 % con
+ventaja grande, 100 % con mate), así que jugadas muy distintas darían Δ = 0. Ahí se desempata
+con la puntuación en centipeones (mate en n = 100 000 − 10·n): igual de buena si está a menos de
+50 cp de la mejor; como mucho **Excelente** hasta 150 cp y como mucho **Buena** más allá (ganar
+un peón en vez de una torre no es ★ aunque ambas «ganen»). Si Δ ya da una categoría peor, se
+queda la peor. Umbrales en `config.py` (`decided_*`).
+
+**Coherencia entre análisis.** La exploración usa las líneas guardadas del análisis cuando la
+posición (o la línea guardada de su posición anterior) ya se analizó; "Pruébalo tú" usa el valor
+guardado si el intento está en el MultiPV y, si no, busca el intento junto a la mejor guardada
+(searchmoves) con los mismos límites que el análisis de la partida. Nunca se compara un valor de
+una búsqueda corta con otro de la búsqueda del análisis.
 
 ### 3.1 Brillante (!!)
 Todas deben cumplirse:
@@ -278,8 +295,11 @@ menor.
 - **Resumen:** material con lo perdido y lo ganado y el balance en peones («Pierdes la dama y
   el alfil a cambio de torre y caballo (unos 4 peones de diferencia)»); en ? y ?? con poco
   material, también lo que dice la evaluación; mate («Esta jugada permite mate inmediato»,
-  «Das mate en 3»); sin consecuencia clara, comparación sin cifras con datos ya conocidos
-  («Con [[X]] mantenías la igualdad; tras tu jugada, el rival queda algo mejor»). Si la posición
+  «Das mate en 3»); sin consecuencia clara, comparación sin cifras con datos ya conocidos. Las
+  comparaciones dejan claro que la alternativa era de quien movió y describen su situación
+  («Con [[g6]] seguías en la partida (el rival algo mejor); ahora la partida queda perdida»; para
+  el rival: «Con [[X]] el rival mantenía la igualdad; ahora quedas algo mejor»); lo mismo en el
+  nivel 2 («con [[X]] ganabas un peón; con tu jugada, el material se mantiene»). Si la posición
   ya estaba decidida antes (win% < 15 o > 85) se dice delante («Tu posición ya estaba perdida,
   pero…»).
 - **Reproducción:** automática (`WHY_STEP_MS`, 1 s), pausa, ◀ ▶ (también con el teclado),
@@ -287,9 +307,10 @@ menor.
   en rojo (errores) o verde (ideas). Controles en el sitio de la barra de navegación (bajo el
   tablero en móvil, al pie del panel en escritorio); frase del paso y tarjeta final en el
   panel (escritorio) o en una franja bajo el tablero (móvil). Nada tapa el tablero.
-- **Pruébalo tú** (?!, ?, ??, ✗): posición anterior, sin la flecha de la mejor; si la jugada es
-  tan buena como la mejor (★, !, !!) se felicita; si no: «Intentar otra vez», «Ver por qué falla
-  tu intento» y «Ver la solución».
+- **Pruébalo tú** (?!, ?, ??, ✗): posición anterior, sin la flecha de la mejor. Cualquier jugada
+  igual de buena que la mejor (§3, misma búsqueda o valor guardado) es un acierto: «¡Bien visto!
+  También valía [[X]]». Si no: «Intentar otra vez», «Ver por qué falla tu intento» y «Ver la
+  solución».
 
 ## 6. API (orientativa)
 Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desarrollo y en producción.

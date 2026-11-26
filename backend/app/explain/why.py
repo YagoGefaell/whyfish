@@ -423,69 +423,98 @@ def _material_summary(
     # A small loss in a ? / ??: the evaluation tells the rest (as in the level-1 text).
     small = abs(c.material) <= 2 and facts.classification in (C.MISTAKE, C.BLUNDER)
     if small and facts.best_line is not None and facts.best_line.sans:
-        user_before = facts.win_before if you else 100.0 - facts.win_before
-        user_after = facts.win_after if you else 100.0 - facts.win_after
-        before, now = _category(user_before), _category(user_after)
-        if before != now:
-            text += f" Con {mt.move(facts.best_line, 0)} {_PAST[before]}; ahora {_NOW[now]}."
+        best = mt.move(facts.best_line, 0)
+        compared = _compare(best, facts.win_before, facts.win_after, you)
+        if compared is not None:
+            text += f" {compared}"
     return text
 
 
 _STATES = (85.0, 65.0, 55.0, 45.0, 35.0, 15.0)
-_PAST = (
-    "tenías la partida ganada",
-    "tenías clara ventaja",
-    "estabas algo mejor",
-    "mantenías la igualdad",
-    "el rival estaba algo mejor",
-    "el rival tenía clara ventaja",
-    "tenías la partida perdida",
-)
-_NOW = (
-    "tienes la partida ganada",
-    "te queda clara ventaja",
-    "quedas algo mejor",
-    "sigue la igualdad",
-    "el rival queda algo mejor",
-    "el rival queda con clara ventaja",
-    "la partida queda perdida",
-)
+# Situation of the MOVER (the one whose alternative is compared), past and present: the
+# alternative is always theirs ("Con [[g6]] seguías en la partida…").
+_PAST = {
+    True: (
+        "tenías la partida ganada",
+        "tenías clara ventaja",
+        "estabas algo mejor",
+        "mantenías la igualdad",
+        "seguías en la partida (el rival algo mejor)",
+        "seguías en la partida (el rival con clara ventaja)",
+        "la partida ya estaba perdida",
+    ),
+    False: (
+        "el rival tenía la partida ganada",
+        "el rival tenía clara ventaja",
+        "el rival estaba algo mejor",
+        "el rival mantenía la igualdad",
+        "el rival seguía en la partida (tú algo mejor)",
+        "el rival seguía en la partida (tú con clara ventaja)",
+        "el rival ya tenía la partida perdida",
+    ),
+}
+_NOW = {
+    True: (
+        "sigues con la partida ganada",
+        "te queda clara ventaja",
+        "quedas algo mejor",
+        "hay igualdad",
+        "el rival queda algo mejor",
+        "el rival queda con clara ventaja",
+        "la partida queda perdida",
+    ),
+    False: (
+        "el rival sigue con la partida ganada",
+        "al rival le queda clara ventaja",
+        "el rival queda algo mejor",
+        "hay igualdad",
+        "quedas algo mejor",
+        "quedas con clara ventaja",
+        "el rival tiene la partida perdida",
+    ),
+}
 
 
-def _category(user_win: float) -> int:
+def _category(mover_win: float) -> int:
     for i, bound in enumerate(_STATES):
-        if user_win > bound or (bound == 45.0 and user_win >= bound):
+        if mover_win > bound or (bound == 45.0 and mover_win >= bound):
             return i
     return len(_STATES)
+
+
+def _compare(mt_best: str, before_win: float, after_win: float, you: bool) -> str | None:
+    """'Con [[g6]] seguías en la partida (el rival algo mejor); ahora la partida queda
+    perdida.' None when both evaluations fall in the same category."""
+    before, now = _category(before_win), _category(after_win)
+    if before == now:
+        return None
+    return f"Con {mt_best} {_PAST[you][before]}; ahora {_NOW[you][now]}."
 
 
 def _quiet_summary(
     facts: MoveFacts, kind: Kind, alternative: bool, you: bool, mt: MarkedText
 ) -> str:
-    """No clear consequence: compare evaluations already known (no numbers)."""
-
-    def user_win(mover_win: float) -> float:
-        return mover_win if you else 100.0 - mover_win
-
-    now = _category(user_win(facts.win_after))
+    """No clear consequence: compare evaluations already known (no numbers). Categories are
+    from the mover's side: the alternative named is theirs."""
+    now = _category(facts.win_after)
     if alternative and facts.second_line is not None:
-        other = _category(user_win(facts.second_line.win))
+        other = _category(facts.second_line.win)
         alt = mt.move(facts.second_line, 0)
         played = "tu" if you else "su"
         if other == now:
+            worse = "ti" if you else "el rival"
             return (
-                f"Con {alt} en su lugar, la posición era peor para {'ti' if you else 'el rival'}; "
-                f"con {played} jugada, {_NOW[now]}."
+                f"Con {alt} en su lugar, la posición era peor para {worse}; "
+                f"con {played} jugada, {_NOW[you][now]}."
             )
-        return f"Con {alt} en su lugar, {_PAST[other]}; con {played} jugada, {_NOW[now]}."
+        return f"Con {alt} en su lugar, {_PAST[you][other]}; con {played} jugada, {_NOW[you][now]}."
     if kind == "idea" or facts.best_line is None or not facts.best_line.sans:
-        return f"Sin ganancia inmediata de material: tras la jugada, {_NOW[now]}."
+        return f"Sin ganancia inmediata de material: tras la jugada, {_NOW[you][now]}."
     best = mt.move(facts.best_line, 0)
-    before = _category(user_win(facts.win_before))
-    if before == now:
-        return f"{best} era algo más precisa, aunque la valoración no cambia: {_NOW[now]}."
-    lead = f"Con {best}" if you else f"Si el rival jugaba {best},"
-    return f"{lead} {_PAST[before]}; tras {'tu' if you else 'su'} jugada, {_NOW[now]}."
+    compared = _compare(best, facts.win_before, facts.win_after, you)
+    if compared is None:
+        return f"{best} era algo más precisa, aunque la valoración no cambia: {_NOW[you][now]}."
+    return compared
 
 
 def _context(mover_win_before: float, you: bool) -> str | None:

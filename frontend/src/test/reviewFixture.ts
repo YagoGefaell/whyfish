@@ -17,6 +17,8 @@ function move(partial: Partial<MoveReview> & Pick<MoveReview, 'ply' | 'uci' | 's
     best_san: partial.san,
     best_line: [partial.san],
     played_line: [],
+    equal_best_uci: [],
+    equal_best_san: [],
     ...partial,
   }
 }
@@ -88,6 +90,8 @@ export const FOOLS_REVIEW: Review = {
       best_san: 'e4',
       best_line: ['e4', 'e5', 'Nf3'],
       played_line: ['e5', 'g4'],
+      equal_best_uci: [],
+      equal_best_san: [],
     }),
     move({ ply: 1, uci: 'e7e5', san: 'e5' }),
     move({
@@ -103,6 +107,8 @@ export const FOOLS_REVIEW: Review = {
       best_san: 'Nc3',
       best_line: ['Nc3', 'Nc6'],
       played_line: ['Qh4#'],
+      equal_best_uci: [],
+      equal_best_san: [],
     }),
     move({ ply: 3, uci: 'd8h4', san: 'Qh4#' }),
   ],

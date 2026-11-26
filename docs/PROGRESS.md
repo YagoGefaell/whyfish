@@ -3,8 +3,9 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 5 ("Ver por qué") — **implementada, pendiente de la revisión del usuario** (informe
-`docs/reports/why-fase5.html` y prueba en la app). No cerrar hasta su OK.
+Fase 5 ("Ver por qué") — **cerrada** (2026-11-26, revisada por el usuario). Siguiente: Fase 6
+(aprendizaje a largo plazo, opcional): no empezar hasta que el usuario lo pida; entonces leer
+SPEC + ROADMAP + este archivo y proponer el plan.
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -186,7 +187,7 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
 - **Tests:** backend 316 + 16 fixtures reales con Stockfish, frontend 45, e2e con captura
   `*-review-explanation.png`.
 
-### Fase 5 — "Ver por qué" (pendiente de revisión)
+### Fase 5 — "Ver por qué" (cerrada 2026-11-26)
 - **Backend:** `explain/why.py` (pura: línea según la clasificación, criterio de extensión,
   final de la secuencia, frases por paso, resumen), `runner.extend_line` (extensión con el motor
   cacheada en `PositionAnalysis` con clave propia), `api/why.py`: `GET …/why?kind=` y
@@ -207,17 +208,37 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
 - **Cambio sobre el plan:** "Pruébalo tú" usa `POST /games/{id}/moves/{ply}/try` (la posición
   anterior ya está en la caché: una sola búsqueda) y "Ver la solución" es `kind=solution`, en vez
   de un endpoint genérico `POST /analysis/why`.
+- **Ajustes de cierre (revisión del usuario):**
+  - Resúmenes comparativos desde el lado de quien movió («Con [[g6]] seguías en la partida (el
+    rival algo mejor); ahora la partida queda perdida»); nivel 2 igual («con [[X]] ganabas…»).
+  - **"La mejor jugada" incoherente — diagnóstico** (286 posiciones de tus partidas): en 126 la
+    2.ª línea del MultiPV estaba a Δ < 1 (empates frecuentes: p. ej. 1…d5 −20 cp frente a 1…Nf6
+    −22, partida 1); en 12 posiciones decididas el win% saturado (97,5 % / 100 %) igualaba
+    jugadas muy distintas (29.Qf7 +13,5 frente a 29.c5 +11,1, partida 8; 34…Ng3# frente a mate
+    en 4, partida 1); y la búsqueda corta de exploración/"Pruébalo tú" (0,3 s, 1 línea) elegía
+    otra mejor en 60 (44 de ellas empates guardados; p. ej. 5…Bd6 guardada frente a 5…Nf6).
+  - **Corregido:** "igual de buena" a Δ < 1 (★, «También valía [[Y]]», «(o [[Y]], igual de
+    buena)», acierto en "Pruébalo tú»); en posiciones decididas, desempate por centipeones /
+    distancia al mate (≥ 50 cp: como mucho excelente; ≥ 150 cp: como mucho buena); exploración
+    con las líneas guardadas de la posición (o de la línea guardada de la anterior); "Pruébalo
+    tú" con el valor guardado o con una búsqueda searchmoves (mejor + intento) con los límites del
+    análisis. En tus partidas cambian 22 de 463 clasificaciones (10 excelente → ★, 12 a la baja en
+    posiciones decididas). Los 16 fixtures reales no cambian.
+  - Tests finales: backend 338 + 16 fixtures reales, frontend 54, e2e 12.
 
 ## Pendiente / siguiente paso
-- Revisión de la Fase 5 por el usuario (informe + app).
+- Fase 6 solo cuando el usuario lo pida.
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
-  `make explain-report`).
+  `make explain-report`); no se ha regenerado tras los ajustes de cierre de la Fase 5 (cambian
+  el nivel 2 comparativo y algunas clasificaciones).
   acciones del coach está preparada para "Profundizar" (Fase 4) y "Pruébalo tú" (Fase 5).
 
 ## Decisiones tomadas
 - **Fase 5 (aprobadas por el usuario, 2026-11-26):** "!" reproduce la alternativa refutada, "!!"
   la entrega, ★ la mejor; sin consecuencia clara, 8 medias jugadas y resumen comparando
   evaluaciones sin cifras; 4 medias jugadas de estabilidad tras la consecuencia (no en mate).
+  Cierre: igual de buena a Δ < 1; posiciones decididas (win% > 85 o < 15) por centipeones;
+  coherencia entre análisis (valor guardado o búsqueda conjunta con los límites del análisis).
 - **Fase 4 (aprobadas por el usuario, 2026-11-26):** una ganancia o pérdida solo se afirma si su
   punto de consecuencia está dentro de la línea y a ≤ 20 medias jugadas (el mismo límite que
   "Ver por qué"); ~25 ms por explicación, sin caché. Sin LLM: explicaciones siempre por

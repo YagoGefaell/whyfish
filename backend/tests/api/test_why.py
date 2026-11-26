@@ -88,3 +88,51 @@ def test_try_it_yourself(client: TestClient, fake_engine: FakeEngine) -> None:
     assert bad["why"]["summary"] == "Esta jugada permite mate inmediato."
     illegal = client.post(f"/api/games/{gid}/moves/2/try", json={"uci": "e2e5"})
     assert illegal.status_code == 400
+
+
+AFTER_F3_E5 = "rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq -"
+
+
+def test_try_attempt_in_the_stored_lines_uses_the_stored_value(
+    client: TestClient, fake_engine: FakeEngine
+) -> None:
+    gid = analysed(client, fake_engine)
+    # d3 is in the stored MultiPV, 2 cp from e3: as good as the best.
+    fake_engine.analyses[AFTER_F3_E5] = (
+        EngineLine(("e2e3", "d8h4"), cp=-60),
+        EngineLine(("d2d3", "b8c6"), cp=-62),
+        EngineLine(("g2g4", "d8h4"), mate=-1),
+    )
+    client.post(f"/api/games/{gid}/analysis")  # same settings: cached, nothing re-analysed
+    calls = len(fake_engine.analyse_calls)
+    body = client.post(f"/api/games/{gid}/moves/2/try", json={"uci": "e2e3"}).json()
+    assert body["correct"] and len(fake_engine.analyse_calls) == calls  # no new search
+
+
+def test_try_unknown_attempt_is_searched_together_with_the_best(
+    client: TestClient, fake_engine: FakeEngine
+) -> None:
+    gid = analysed(client, fake_engine)
+    calls = len(fake_engine.analyse_calls)
+    body = client.post(f"/api/games/{gid}/moves/2/try", json={"uci": "b1c3"}).json()
+    assert len(fake_engine.analyse_calls) == calls + 1
+    roots = fake_engine.analyse_root_moves[-1]
+    assert roots is not None and {m.uci() for m in roots} == {"e2e3", "b1c3"}
+    assert fake_engine.analyse_limits[-1].time == 0.5  # the game analysis' limit, not 0.3 s
+    # The fake scores both 0: equally good, so it counts, naming the stored best.
+    assert body["correct"] and body["also"] == ["e3"]
+
+
+def test_exploration_of_an_analysed_position_uses_the_stored_lines(
+    client: TestClient, fake_engine: FakeEngine
+) -> None:
+    gid = analysed(client, fake_engine)
+    calls = len(fake_engine.analyse_calls)
+    fen = AFTER_F3_E5 + " 0 2"
+    body = client.post("/api/analysis/evaluate", json={"fen": fen, "moves": []}).json()
+    assert body["best_uci"] == "e2e3" and len(fake_engine.analyse_calls) == calls
+    # One move further along a stored line: that line, seen from the other side.
+    after = client.post("/api/analysis/evaluate", json={"fen": fen, "moves": ["g2g4"]}).json()
+    assert after["best_uci"] == "d8h4" and after["lines"][0]["mate"] == 1
+    assert len(fake_engine.analyse_calls) == calls
+    del gid

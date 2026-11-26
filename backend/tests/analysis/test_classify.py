@@ -6,6 +6,7 @@ import pytest
 from app.analysis.classify import (
     MoveInput,
     classify,
+    equal_moves,
     is_obvious_recapture,
     is_sacrifice,
 )
@@ -230,3 +231,38 @@ def test_no_brilliant_when_already_down_material() -> None:
     fen = "r5k1/5p1p/6p1/8/3N4/8/5PPP/6K1 w - - 0 1"
     verdict = classify(inp(fen, "d4f5", ev(("d4f5 g6f5", -20), ("d4e2", -40))))
     assert verdict.classification is not C.BRILLIANT
+
+
+class TestEqualAndDecided:
+    """SPEC §3: moves as good as the best, and decided positions compared by score."""
+
+    def test_two_equivalent_moves(self) -> None:
+        # e4 and d4 within 1 win% point: both are the best.
+        before = ev(("e2e4 e7e5", 28), ("d2d4 d7d5", 23), ("g1f3", -40))
+        assert equal_moves(before) == ("d2d4",)
+        verdict = classify(inp(START, "d2d4", before))
+        assert verdict.delta < 1.0 and verdict.classification is C.BEST
+
+    # White is winning anyway: Qxa8+ wins a rook, Qxd7 only a pawn. Both saturate win%.
+    WON = "r6k/3p2pp/8/3Q4/8/8/5PPP/4R1K1 w - - 0 1"
+
+    def test_winning_a_pawn_instead_of_a_rook_is_not_best(self) -> None:
+        before = ev(("d5a8", 1500), ("d5d7", 1100))
+        pawn = classify(inp(self.WON, "d5d7", before))
+        assert pawn.delta == 0.0  # win% says nothing...
+        assert pawn.classification is C.GOOD  # ...the score does (400 cp worse)
+        assert classify(inp(self.WON, "d5a8", before)).classification is C.BEST
+        assert equal_moves(before) == ()
+
+    def test_close_scores_in_a_decided_position_are_equal(self) -> None:
+        before = ev(("d5a8", 1500), ("d5d7", 1460))
+        assert equal_moves(before) == ("d5d7",)
+        assert classify(inp(self.WON, "d5d7", before)).classification is C.BEST
+
+    def test_a_slightly_slower_mate_is_still_best(self) -> None:
+        before = PositionEval(lines=(EngineLine(("d5a8",), mate=2), EngineLine(("d5d7",), mate=3)))
+        assert classify(inp(self.WON, "d5d7", before)).classification is C.BEST
+
+    def test_middling_score_gap_is_excellent(self) -> None:
+        before = ev(("d5a8", 1500), ("d5d7", 1400))
+        assert classify(inp(self.WON, "d5d7", before)).classification is C.EXCELLENT

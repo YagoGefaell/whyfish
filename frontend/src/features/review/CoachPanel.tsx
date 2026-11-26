@@ -67,6 +67,28 @@ function Line({
   )
 }
 
+/** Clickable SAN moves joined with commas and "o" ("Nf3, d4 o c4"). */
+function EqualMoves({ sans, onPick }: { sans: string[]; onPick: (san: string) => void }) {
+  return (
+    <>
+      {sans.map((san, i) => (
+        <span key={san}>
+          {i > 0 && (i === sans.length - 1 ? ' o ' : ', ')}
+          <button
+            type="button"
+            onClick={() => {
+              onPick(san)
+            }}
+            className="tabular rounded-md bg-panel-2 px-1.5 py-px font-semibold hover:bg-[#45423e]"
+          >
+            {san}
+          </button>
+        </span>
+      ))}
+    </>
+  )
+}
+
 /** "Coach" card for the selected move: verdict, explanation, actions, engine details. */
 export function CoachPanel({
   move,
@@ -99,6 +121,14 @@ export function CoachPanel({
   const alternative = showsAlternative(move)
   const canDeepen = deep || Boolean(explanation?.text)
   const whyKind = whyKindOf(move, explanation)
+  // A best move (★, !, !!): the other moves as good as it ("También valía Y").
+  const isBest = ['best', 'great', 'brilliant'].includes(move.classification)
+  const alsoGood = isBest
+    ? [
+        ...(move.best_san && move.best_uci !== move.uci ? [move.best_san] : []),
+        ...move.equal_best_san.filter((_, i) => move.equal_best_uci[i] !== move.uci),
+      ]
+    : []
   const canTry = canTryMove(move)
 
   return (
@@ -115,9 +145,36 @@ export function CoachPanel({
       <MoveExplanation explanation={explanation} loading={explanationLoading} onRef={onRef} />
 
       {alternative && (
-        <p className="flex items-center gap-2 rounded-lg bg-panel-2/60 px-3 py-2 text-sm">
+        <p
+          aria-label="Mejor jugada"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-panel-2/60 px-3 py-2 text-sm"
+        >
           <ClassBadge classification="best" size={18} />
           La mejor era <strong className="tabular text-accent-strong">{move.best_san}</strong>
+          {move.equal_best_san.length > 0 && (
+            <span>
+              (o{' '}
+              <EqualMoves
+                sans={move.equal_best_san}
+                onPick={(san) => {
+                  onLine('before', [san], 0)
+                }}
+              />
+              , igual de buena)
+            </span>
+          )}
+        </p>
+      )}
+      {!alternative && alsoGood.length > 0 && (
+        <p className="text-sm" aria-label="Igual de buenas">
+          También valía{' '}
+          <EqualMoves
+            sans={alsoGood}
+            onPick={(san) => {
+              onLine('before', [san], 0)
+            }}
+          />
+          .
         </p>
       )}
 

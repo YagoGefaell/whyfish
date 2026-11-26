@@ -3,7 +3,7 @@
 import asyncio
 import contextlib
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Protocol
 
 import chess
@@ -49,11 +49,17 @@ class Engine(Protocol):
         """Full-strength evaluation of `board`."""
 
     async def analyse(
-        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+        self,
+        board: chess.Board,
+        limit: chess.engine.Limit,
+        multipv: int,
+        root_moves: Sequence[chess.Move] | None = None,
     ) -> tuple[EngineLine, ...]:
         """Top `multipv` lines (best first), scores from the side to move's point of view.
 
-        `board`'s move history is sent too, so the engine can see repetitions.
+        `board`'s move history is sent too, so the engine can see repetitions. `root_moves`
+        restricts the search to those moves (UCI searchmoves): two moves compared in the same
+        search get comparable scores.
         """
 
     async def close(self) -> None: ...
@@ -158,11 +164,20 @@ class StockfishEngine:
         return score
 
     async def analyse(
-        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+        self,
+        board: chess.Board,
+        limit: chess.engine.Limit,
+        multipv: int,
+        root_moves: Sequence[chess.Move] | None = None,
     ) -> tuple[EngineLine, ...]:
         try:
             async with self._lock:
-                infos = await self._protocol.analyse(board, limit, multipv=multipv)
+                infos = await self._protocol.analyse(
+                    board,
+                    limit,
+                    multipv=multipv,
+                    root_moves=list(root_moves) if root_moves else None,
+                )
         except chess.engine.EngineError as exc:
             raise EngineUnavailableError(f"Engine failed while analysing: {exc!r}") from exc
         lines: list[EngineLine] = []

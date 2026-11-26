@@ -8,7 +8,14 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 
 from app.analysis.book import default_book
-from app.analysis.evaluate import Evaluation, EvaluationInputError, build_board, evaluate
+from app.analysis.evaluate import (
+    Evaluation,
+    EvaluationInputError,
+    build_board,
+    describe,
+    evaluate,
+)
+from app.analysis.positions import terminal_eval
 from app.analysis.review import GameReview, MoveReview, PlayerSummary, build_review
 from app.analysis.runner import (
     AnalysisEngineUnavailableError,
@@ -75,6 +82,9 @@ class MoveReviewRead(BaseModel):
     best_san: str | None
     best_line: list[str]
     played_line: list[str]
+    # Other moves as good as the best (Δ < 1): "También valía [[Y]]" / "(o [[Y]], igual de buena)".
+    equal_best_uci: list[str]
+    equal_best_san: list[str]
 
     @classmethod
     def from_review(cls, m: MoveReview) -> "MoveReviewRead":
@@ -93,6 +103,8 @@ class MoveReviewRead(BaseModel):
             best_san=m.best_san,
             best_line=list(m.best_line),
             played_line=list(m.played_line),
+            equal_best_uci=[u for u, _ in m.equal_best],
+            equal_best_san=[san for _, san in m.equal_best],
         )
 
 
@@ -198,12 +210,20 @@ async def evaluate_position(
     body: EvaluateRequest,
     pools: Annotated[PoolManager, Depends(get_pools)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    service: Analysis,
 ) -> EvaluationRead:
+    """A position the game analysis already saw gets its stored lines (same search as the
+    review, so the best move is the same); any other position a short search."""
     try:
         board = build_board(body.fen, body.moves)
     except EvaluationInputError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     multipv = max(1, min(body.multipv, settings.evaluate_max_multipv))
+    cached = service.cached_lines(board) if terminal_eval(board) is None else None
+    if cached:
+        return EvaluationRead.from_evaluation(
+            describe(board, cached[:multipv], settings.evaluate_line_plies)
+        )
     limit = chess.engine.Limit(time=settings.evaluate_time_s)
     try:
         result = await evaluate(pools, board, limit, multipv, settings.evaluate_line_plies)

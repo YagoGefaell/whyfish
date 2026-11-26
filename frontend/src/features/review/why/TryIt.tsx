@@ -38,9 +38,17 @@ export function TryIt({ state, side, busy, onRetry, onWhyAttempt, onSolution, on
       {state.status === 'checking' && <p className="text-muted">Comprobando tu jugada…</p>}
       {state.status === 'error' && <p className="text-[#f87171]">{state.message}</p>}
       {state.status === 'done' && state.result.correct && (
-        <p className="flex items-center gap-2 font-medium text-[#4ade80]">
-          <Check size={18} /> ¡Bien visto! <span className="tabular">{state.result.san}</span> es la
-          mejor jugada.
+        <p className="flex flex-wrap items-center gap-x-2 font-medium text-[#4ade80]">
+          <Check size={18} /> ¡Bien visto!{' '}
+          {state.result.also.length > 0 ? (
+            <span>
+              También valía <span className="tabular">{state.result.also.join(' o ')}</span>.
+            </span>
+          ) : (
+            <span>
+              <span className="tabular">{state.result.san}</span> es la mejor jugada.
+            </span>
+          )}
         </p>
       )}
       {state.status === 'done' && !state.result.correct && (

@@ -485,14 +485,32 @@ def commented_line(
     return ", ".join(items) + "." if items else None
 
 
-def _outcome(line: LineOutcome, t: FactThresholds) -> str:
+def _outcome(line: LineOutcome, t: FactThresholds, voice: es.Voice, past: bool) -> str:
+    """What a line gives the MOVER, said from the mover's side: 'ganabas un peón' (the
+    alternative, past) / 'pierdes la calidad' (the move played); third person by colour."""
+    forms = {
+        True: {
+            "mate": ("dabas mate", "das mate"),
+            "mated": ("recibías mate", "recibes mate"),
+            "win": ("ganabas", "ganas"),
+            "lose": ("perdías", "pierdes"),
+        },
+        False: {
+            "mate": ("daban mate", "dan mate"),
+            "mated": ("recibían mate", "reciben mate"),
+            "win": ("ganaban", "ganan"),
+            "lose": ("perdían", "pierden"),
+        },
+    }[voice.you]
+    tense = 0 if past else 1
+    subject = "" if voice.you else f"{es.color_noun(voice.mover)} "
     if line.mate is not None:
-        return "se da mate" if line.mate > 0 else "se recibe mate"
+        return subject + forms["mate" if line.mate > 0 else "mated"][tense]
     if line.material >= t.material_min:
-        return es.win(line.material)
+        return f"{subject}{forms['win'][tense]} {es.material(line.material)}"
     if line.material <= -t.material_min:
-        return es.lose(-line.material)
-    return "el material se mantiene"
+        return f"{subject}{forms['lose'][tense]} {es.material(-line.material)}"
+    return "el material se mantiene" if not past else "el material se mantenía"
 
 
 def level2(
@@ -517,8 +535,9 @@ def level2(
         text = commented_line(bl, 0, t.commented_line_plies, fen, mt)
         if text and pl is not None:
             paragraphs.append(
-                f"Con la mejor: {text} La diferencia: con {mt.move(bl, 0)} {_outcome(bl, t)}; "
-                f"con la jugada hecha, {_outcome(pl, t)}."
+                f"Con la mejor: {text} La diferencia: con {mt.move(bl, 0)} "
+                f"{_outcome(bl, t, voice, past=True)}; con {voice.possessive} jugada, "
+                f"{_outcome(pl, t, voice, past=False)}."
             )
 
     if second is not None and idea is not None and idea.kind == K.ONLY_MOVE:

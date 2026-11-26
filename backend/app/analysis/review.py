@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import chess
 
 from app.analysis.book import Opening, OpeningBook
-from app.analysis.classify import MoveInput, classify
+from app.analysis.classify import MoveInput, classify, equal_moves
 from app.analysis.types import Classification, PositionEval
 from app.analysis.winprob import game_accuracy, position_win, volatility_weights
 from app.config import THRESHOLDS, ClassificationThresholds
@@ -41,6 +41,8 @@ class MoveReview:
     best_san: str | None
     best_line: tuple[str, ...]  # SAN, from the position before the move
     played_line: tuple[str, ...]  # SAN, the engine's best continuation after the played move
+    # Other moves as good as the best one (SPEC §3: Δ < equal_max_delta): UCI and SAN.
+    equal_best: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,9 @@ def build_review(
                 best_san=best_line[0] if best_line else None,
                 best_line=best_line,
                 played_line=_san_line(after_board, after.lines[0].moves) if after.lines else (),
+                equal_best=tuple(
+                    (u, board.san(chess.Move.from_uci(u))) for u in equal_moves(before, t)
+                ),
             )
         )
         previous = verdict.classification

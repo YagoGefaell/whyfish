@@ -130,8 +130,16 @@ class ClassificationThresholds:
     good: float = 5.0
     inaccuracy: float = 10.0
     mistake: float = 20.0
-    # "Best" also covers moves whose Δ is at most this (another move as good as the top one).
-    best_max_delta: float = 0.5
+    # Moves "as good as the best" (SPEC §3): Δ below this win%. Such a move is also ★, and the
+    # coach names the other equal moves ("También valía [[Y]]").
+    equal_max_delta: float = 1.0
+    # Decided positions (mover's win% above `decided_above` or below 100 - it): win% saturates,
+    # so moves are compared by score (centipawns; mate = MATE_SCORE - 10 per move). Equal when
+    # within `decided_equal_max_cp`; at most excellent up to `decided_excellent_max_cp`, at
+    # most good beyond (winning a pawn instead of a rook is not ★ just because both "win").
+    decided_above: float = 85.0
+    decided_equal_max_cp: int = 50
+    decided_excellent_max_cp: int = 150
     # A book move only counts as theory if it is not an error (Δ below this); the opening
     # dataset also contains traps such as "Barnes Opening: Fool's Mate".
     book_max_delta: float = 10.0

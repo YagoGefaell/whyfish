@@ -11,7 +11,7 @@ import chess
 from app.analysis import material
 from app.analysis.sacrifice import find_sacrifice
 from app.analysis.types import Classification, PositionEval
-from app.analysis.winprob import line_win, move_accuracy, position_win
+from app.analysis.winprob import MATE_SCORE, line_score, line_win, move_accuracy, position_win
 from app.config import THRESHOLDS, ClassificationThresholds
 
 C = Classification
@@ -84,6 +84,7 @@ def _classification(
     ):
         return C.BRILLIANT
     best = is_best(inp)
+    gap = score_gap(inp) if decided(wb, t) else None
     if (
         best
         and special
@@ -93,8 +94,21 @@ def _classification(
         and is_great(inp.before, t)
     ):
         return C.GREAT
-    if best or delta <= t.best_max_delta:
+    equal = delta < t.equal_max_delta and (gap is None or gap < t.decided_equal_max_cp)
+    if best or equal:
         return C.BEST
+    by_delta = _by_delta(delta, t)
+    if gap is None or gap < t.decided_equal_max_cp:
+        return by_delta
+    # Decided position: win% says (almost) nothing; the score keeps the move from being ★.
+    cap = C.EXCELLENT if gap < t.decided_excellent_max_cp else C.GOOD
+    return max(by_delta, cap, key=_ORDER.index)
+
+
+_ORDER = [C.BEST, C.EXCELLENT, C.GOOD, C.INACCURACY, C.MISTAKE, C.BLUNDER]
+
+
+def _by_delta(delta: float, t: ClassificationThresholds) -> Classification:
     if delta < t.excellent:
         return C.EXCELLENT
     if delta < t.good:
@@ -120,6 +134,51 @@ def takes_free_material(board: chess.Board, move: chess.Move) -> bool:
     after = board.copy(stack=False)
     after.push(move)
     return material.captured_value(board, move) - material.see(after, move.to_square) >= 1
+
+
+def decided(win: float, t: ClassificationThresholds) -> bool:
+    """The game is (nearly) decided for one side: win% saturates there."""
+    return win > t.decided_above or win < 100.0 - t.decided_above
+
+
+def move_score(inp: MoveInput) -> int | None:
+    """Score (cp-equivalent) of the played move for the mover, from the same data as its win%."""
+    uci = inp.move.uci()
+    for line in inp.before.lines:
+        if line.move == uci:
+            return line_score(line)
+    if inp.after.lines:
+        return -line_score(inp.after.lines[0])
+    after = inp.board.copy(stack=False)
+    after.push(inp.move)
+    if after.is_checkmate():
+        return MATE_SCORE
+    return 0 if after.is_game_over() else None
+
+
+def score_gap(inp: MoveInput) -> int | None:
+    """How much worse than the best line the played move scores (cp), if both are known."""
+    if not inp.before.lines:
+        return None
+    played = move_score(inp)
+    return None if played is None else max(0, line_score(inp.before.lines[0]) - played)
+
+
+def equal_moves(before: PositionEval, t: ClassificationThresholds = THRESHOLDS) -> tuple[str, ...]:
+    """Other MultiPV moves as good as the best one (UCI, in MultiPV order): Δ win% below
+    `equal_max_delta` and, in a decided position, a score within `decided_equal_max_cp`."""
+    if len(before.lines) < 2:
+        return ()
+    top = before.lines[0]
+    top_win = line_win(top)
+    out: list[str] = []
+    for line in before.lines[1:]:
+        if not line.moves or top_win - line_win(line) >= t.equal_max_delta:
+            continue
+        if decided(top_win, t) and line_score(top) - line_score(line) >= t.decided_equal_max_cp:
+            continue
+        out.append(line.move)
+    return tuple(out)
 
 
 def is_best(inp: MoveInput) -> bool:

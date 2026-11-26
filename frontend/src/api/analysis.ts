@@ -45,6 +45,9 @@ export interface MoveReview {
   best_line: string[]
   /** SAN from the position after the move: the engine's continuation. */
   played_line: string[]
+  /** Other moves as good as the best one (Δ < 1): UCI and SAN, same order. */
+  equal_best_uci: string[]
+  equal_best_san: string[]
 }
 
 export interface PlayerSummary {
@@ -148,6 +151,8 @@ export interface TryResult {
   san: string
   classification: Classification
   correct: boolean
+  /** Other moves as good (SAN): "¡Bien visto! También valía X". */
+  also: string[]
   why: Why | null
 }
 

@@ -43,6 +43,8 @@ class FakeEngine:
     # Analysis: lines per EPD; positions not listed get the first legal moves with cp 0.
     analyses: dict[str, tuple[EngineLine, ...]] = field(default_factory=dict)
     analyse_calls: list[chess.Board] = field(default_factory=list)
+    analyse_limits: list[chess.engine.Limit] = field(default_factory=list)
+    analyse_root_moves: list[tuple[chess.Move, ...] | None] = field(default_factory=list)
     closed: bool = False
 
     @property
@@ -81,13 +83,28 @@ class FakeEngine:
         return self.evaluation
 
     async def analyse(
-        self, board: chess.Board, limit: chess.engine.Limit, multipv: int
+        self,
+        board: chess.Board,
+        limit: chess.engine.Limit,
+        multipv: int,
+        root_moves: Sequence[chess.Move] | None = None,
     ) -> tuple[EngineLine, ...]:
         self.analyse_calls.append(board.copy())
+        self.analyse_limits.append(limit)
+        self.analyse_root_moves.append(tuple(root_moves) if root_moves else None)
+        allowed = {m.uci() for m in root_moves} if root_moves else None
         if board.epd() in self.analyses:
-            return self.analyses[board.epd()]
-        moves = sorted(board.legal_moves, key=lambda m: m.uci())[:multipv]
-        return tuple(EngineLine(moves=(m.uci(),), cp=0) for m in moves)
+            lines = self.analyses[board.epd()]
+            if allowed is not None:
+                # Like searchmoves: every requested move gets a line (cp 0 if not scripted).
+                lines = tuple(ln for ln in lines if ln.move in allowed)
+                missing = sorted(allowed - {ln.move for ln in lines})
+                lines += tuple(EngineLine(moves=(uci,), cp=0) for uci in missing)
+            return lines[:multipv] if allowed is not None else lines
+        legal = sorted(board.legal_moves, key=lambda m: m.uci())
+        if root_moves:
+            legal = [m for m in legal if m in root_moves]
+        return tuple(EngineLine(moves=(m.uci(),), cp=0) for m in legal[:multipv])
 
     async def close(self) -> None:
         self.closed = True

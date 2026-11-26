@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.analysis.book import default_book
-from app.analysis.classify import MoveInput, classify
+from app.analysis.classify import MoveInput, classify, equal_moves
 from app.analysis.facts import MoveFacts, build_move_facts
-from app.analysis.positions import engine_board
+from app.analysis.positions import engine_board, terminal_eval
 from app.analysis.runner import AnalysisEngineUnavailableError, AnalysisService
 from app.analysis.types import Classification, PositionEval
 from app.api.analysis import Analysis, MoveRefRead, Repo, _reviewed, get_pools
@@ -193,7 +193,8 @@ class TryRead(BaseModel):
     uci: str
     san: str
     classification: Classification
-    correct: bool  # as good as the best move (best / great / brilliant)
+    correct: bool  # as good as the best move (Δ < equal_max_delta: ★, ! or !!)
+    also: list[str]  # other moves as good (SAN): "¡Bien visto! También valía [[X]]"
     why: WhyRead | None  # why the attempt fails (None when it is correct)
 
 
@@ -207,7 +208,12 @@ async def try_move(
     pools: Annotated[PoolManager, Depends(get_pools)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> TryRead:
-    """ "Pruébalo tú": the user's attempt in the position before move `ply`."""
+    """ "Pruébalo tú": the user's attempt in the position before move `ply`.
+
+    Fair comparison (SPEC §5.4): an attempt that is one of the stored MultiPV lines keeps its
+    stored value; any other is searched together with the stored best move (searchmoves) with
+    the same limits as the game analysis, so both scores come from the same search.
+    """
     loaded, evals, review = _reviewed(game_id, service, repo)
     ucis = [m.uci for m in loaded.moves]
     if not 0 <= ply < len(ucis):
@@ -220,23 +226,34 @@ async def try_move(
     if move not in board.legal_moves:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Jugada ilegal.")
     san = board.san(move)
-    before = evals[ply]
+    stored = evals[ply]
+    best = stored.lines[0] if stored.lines else None
+    before = stored
     after_board = board.copy()
     after_board.push(move)
-    if any(line.move == move.uci() for line in before.lines) or after_board.is_game_over():
-        after = PositionEval(lines=())  # the cached MultiPV already scores it
-    else:
-        limit = chess.engine.Limit(time=settings.evaluate_time_s)
+    known = any(line.move == move.uci() for line in stored.lines)
+    after = terminal_eval(after_board) or PositionEval(lines=())
+    if not known and best is not None and not after_board.is_game_over():
+        limit = chess.engine.Limit(time=settings.analysis_time_s, depth=settings.analysis_depth)
+        root = [chess.Move.from_uci(best.move), move]
         try:
             async with pools.use() as pool, pool.acquire() as engine:
-                lines = await engine.analyse(engine_board(after_board), limit, 1)
+                lines = await engine.analyse(engine_board(board), limit, 2, root_moves=root)
+                if not any(line.move == move.uci() for line in lines):
+                    # The search did not report the attempt: score it on its own, same limit.
+                    reply = await engine.analyse(engine_board(after_board), limit, 1)
+                    after = PositionEval(lines=reply)
         except EngineUnavailableError as exc:
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
-        after = PositionEval(lines=lines)
+        before = PositionEval(lines=lines)
     previous = review.moves[ply - 1].classification if ply > 0 else None
     facts = _facts_for(board, move, before, after, ply, previous)
-    best = before.lines[0] if before.lines else None
-    correct = facts.classification in GOOD_ENOUGH or (best is not None and best.move == move.uci())
+    correct = facts.classification in GOOD_ENOUGH
+    also: list[str] = []
+    if correct:
+        candidates = [best.move] if best is not None else []
+        candidates += list(equal_moves(stored))
+        also = [board.san(chess.Move.from_uci(u)) for u in candidates if u != move.uci()]
     why = None
     if not correct:
         line = why_line(facts, "refutation")
@@ -248,5 +265,10 @@ async def try_move(
             )
             why = WhyRead.from_why(built, settings.why_step_ms)
     return TryRead(
-        uci=move.uci(), san=san, classification=facts.classification, correct=correct, why=why
+        uci=move.uci(),
+        san=san,
+        classification=facts.classification,
+        correct=correct,
+        also=list(dict.fromkeys(also)),
+        why=why,
     )
