@@ -33,6 +33,7 @@ export function NewGamePage() {
     event.preventDefault()
     setSubmitting(true)
     setError(null)
+    const createdAt = Date.now()
     gamesApi
       .create({
         color,
@@ -41,7 +42,9 @@ export function NewGamePage() {
         allow_hint: allowHint,
         fen: fen.trim() || null,
       })
-      .then((game) => navigate(`/play/${String(game.id)}`))
+      // `createdAt`: if the bot opens (user with black), the play page shows its minimum
+      // "thinking" time, minus what the creation already took (SPEC §1.1).
+      .then((game) => navigate(`/play/${String(game.id)}`, { state: { createdAt } }))
       .catch((err: unknown) => {
         setError(err instanceof ApiError ? err.message : 'No se pudo crear la partida.')
         setSubmitting(false)

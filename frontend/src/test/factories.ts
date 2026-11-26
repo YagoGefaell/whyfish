@@ -25,6 +25,7 @@ export function gameState(overrides: Partial<GameState> = {}): GameState {
     allow_hint: false,
     undo_count: 0,
     hint_count: 0,
+    bot_think: { min_s: 0, max_s: 0 },
     ...overrides,
   }
 }

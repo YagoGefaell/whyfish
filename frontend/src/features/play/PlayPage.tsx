@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { gamesApi, type Color, type GameState } from '../../api/games'
 import { Board } from '../../components/board/Board'
 import { COLOR_LABEL, endText } from './gameText'
@@ -18,8 +18,27 @@ export function PlayPage() {
   return <PlayGameView key={gameId} gameId={gameId} />
 }
 
+/** `createdAt` from the new-game page: only right after creating the game, never on a reload. */
+function useCreatedAt(): number | null {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [createdAt] = useState(() => {
+    const state: unknown = location.state
+    if (state && typeof state === 'object' && 'createdAt' in state) {
+      const value = state.createdAt
+      return typeof value === 'number' ? value : null
+    }
+    return null
+  })
+  useEffect(() => {
+    // Drop it from the history entry: a reload must not wait again.
+    if (location.state) void navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, location.pathname, navigate])
+  return createdAt
+}
+
 function PlayGameView({ gameId }: { gameId: number }) {
-  const play = usePlayGame(gameId)
+  const play = usePlayGame(gameId, useCreatedAt())
   const [orientation, setOrientation] = useState<Color | null>(null)
 
   if (play.loadError) return <p className="text-danger">{play.loadError}</p>
@@ -42,7 +61,8 @@ function PlayGameView({ gameId }: { gameId: number }) {
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:justify-center">
-      <div className="w-full min-w-0 lg:w-[min(calc(100vw-27rem),calc(100dvh-6.5rem))] lg:shrink-0">
+      <div className="flex w-full min-w-0 flex-col gap-1.5 lg:w-[min(calc(100vw-27rem),calc(100dvh-8.5rem))] lg:shrink-0">
+        <BotStrip label={game.bot_level_label} thinking={play.thinking} />
         <Board
           fen={play.fen}
           orientation={orientation ?? game.player_color}
@@ -79,6 +99,20 @@ function PlayGameView({ gameId }: { gameId: number }) {
         />
         <AssistsUsed game={game} />
       </aside>
+    </div>
+  )
+}
+
+/** The bot's strip above the board, with a discreet "pensando…" while its reply is held back. */
+function BotStrip({ label, thinking }: { label: string | null; thinking: boolean }) {
+  return (
+    <div data-testid="bot-strip" className="flex h-6 items-center gap-2 text-sm font-semibold">
+      <span>Stockfish{label ? ` · ${label}` : ''}</span>
+      {thinking && (
+        <span role="status" className="animate-pulse text-xs font-medium text-muted">
+          pensando…
+        </span>
+      )}
     </div>
   )
 }

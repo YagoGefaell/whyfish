@@ -226,6 +226,16 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
     posiciones decididas). Los 16 fixtures reales no cambian.
   - Tests finales: backend 338 + 16 fixtures reales, frontend 54, e2e 12.
 
+### Ajuste: tiempo de "pensar" del bot (2026-11-26, fuera de fases)
+- Rango por nivel en `LEVEL_PRESETS` (configurable), escala `BOT_THINK_SCALE` (0 en e2e);
+  `bot_think` en `GameState`. Frontend: `usePlayGame` retiene la respuesta del bot lo que falte
+  hasta el mínimo (`thinkDelay`), estado intermedio con tu jugada ya hecha, franja del bot con
+  "pensando…" encima del tablero; primera jugada del bot solo con el mínimo (marca `createdAt`
+  al crear la partida, que se borra del historial para que recargar no espere).
+- Tests: API (rango por nivel, escala 0), Vitest con temporizadores falsos (la respuesta llega
+  tras el mínimo y no antes; sin espera extra si el motor ya tardó más; apertura del bot;
+  recarga sin espera).
+
 ## Pendiente / siguiente paso
 - Fase 6 solo cuando el usuario lo pida.
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con

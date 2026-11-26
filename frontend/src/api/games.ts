@@ -57,6 +57,8 @@ export interface GameState extends GameSummary {
   allow_hint: boolean
   undo_count: number
   hint_count: number
+  /** Minimum time the bot is shown "thinking" before its reply (random in range); null if imported. */
+  bot_think: { min_s: number; max_s: number } | null
 }
 
 export interface NewGame {

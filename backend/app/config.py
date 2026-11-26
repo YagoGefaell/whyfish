@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # --- Play -------------------------------------------------------------
     # Upper bound on the bot's thinking time per move, for every level.
     bot_movetime_s: float = 1.0
+    # Scale of the minimum "thinking" time shown before the bot's reply (LevelPreset.think_*):
+    # 0 turns it off (tests).
+    bot_think_scale: float = 1.0
     # Full-strength search time used to compute a hint.
     hint_time_s: float = 0.3
     # Search time used to evaluate a draw offer.
@@ -108,12 +111,20 @@ class LevelPreset:
     skill_level: int | None = None
     uci_elo: int | None = None
     depth: int | None = None
+    # Minimum "thinking" time shown before the bot's reply (SPEC §1.1), random in this range
+    # (seconds). Applied by the frontend: it only waits for what the request did not take.
+    think_min_s: float = 0.5
+    think_max_s: float = 0.5
 
 
 LEVEL_PRESETS: dict[BotLevel, LevelPreset] = {
-    BotLevel.BEGINNER: LevelPreset("Principiante ~800", skill_level=0, depth=1),
-    BotLevel.NOVICE: LevelPreset("Novato ~1100", skill_level=3, depth=4),
-    BotLevel.CLUB: LevelPreset("Club ~1500", uci_elo=1500),
+    BotLevel.BEGINNER: LevelPreset(
+        "Principiante ~800", skill_level=0, depth=1, think_min_s=0.8, think_max_s=1.6
+    ),
+    BotLevel.NOVICE: LevelPreset(
+        "Novato ~1100", skill_level=3, depth=4, think_min_s=0.8, think_max_s=1.6
+    ),
+    BotLevel.CLUB: LevelPreset("Club ~1500", uci_elo=1500, think_min_s=0.8, think_max_s=1.8),
     BotLevel.STRONG: LevelPreset("Fuerte ~2000", uci_elo=2000),
     BotLevel.MAX: LevelPreset("Máximo"),
 }

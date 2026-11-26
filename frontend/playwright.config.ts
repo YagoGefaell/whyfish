@@ -55,6 +55,7 @@ export default defineConfig({
         EVALUATE_TIME_S: '0.1',
         BOT_MOVETIME_S: '0.05',
         WHY_STEP_MS: '400',
+        BOT_THINK_SCALE: '0', // no minimum "thinking" time for the bot in tests
       },
       url: `http://127.0.0.1:${String(BACKEND_PORT)}/api/health`,
       reuseExistingServer: false,

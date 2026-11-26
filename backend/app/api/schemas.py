@@ -75,6 +75,13 @@ class GameSummary(BaseModel):
         )
 
 
+class BotThinkRead(BaseModel):
+    """Minimum time the frontend shows the bot "thinking" before its reply (random in range)."""
+
+    min_s: float
+    max_s: float
+
+
 class GameState(GameSummary):
     status: Literal["ongoing", "finished"]
     initial_fen: str
@@ -85,10 +92,14 @@ class GameState(GameSummary):
     allow_hint: bool
     undo_count: int
     hint_count: int
+    bot_think: BotThinkRead | None  # None for imported games
 
     @classmethod
     def from_loaded(
-        cls, loaded: LoadedGame, analysis_status: AnalysisStatus | None = None
+        cls,
+        loaded: LoadedGame,
+        analysis_status: AnalysisStatus | None = None,
+        think_scale: float = 1.0,
     ) -> "GameState":
         game = loaded.game
         summary = GameSummary.from_game(game, len(loaded.moves), analysis_status)
@@ -105,7 +116,15 @@ class GameState(GameSummary):
             allow_hint=game.allow_hint,
             undo_count=game.undo_count,
             hint_count=game.hint_count,
+            bot_think=_bot_think(game.bot_level, think_scale),
         )
+
+
+def _bot_think(level: BotLevel | None, scale: float) -> BotThinkRead | None:
+    if level is None:
+        return None
+    preset = LEVEL_PRESETS[level]
+    return BotThinkRead(min_s=preset.think_min_s * scale, max_s=preset.think_max_s * scale)
 
 
 class GameImport(BaseModel):

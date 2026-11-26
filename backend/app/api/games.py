@@ -35,6 +35,7 @@ router = APIRouter()
 Service = Annotated[GameService, Depends(get_game_service)]
 Repo = Annotated[GameRepository, Depends(get_game_repository)]
 Lock = Annotated[asyncio.Lock, Depends(get_game_lock)]
+Config = Annotated[Settings, Depends(get_settings_dep)]
 
 
 def _http_error(exc: Exception) -> HTTPException:
@@ -104,7 +105,9 @@ def import_pgn(
 
 
 @router.post("/games", status_code=status.HTTP_201_CREATED)
-async def create_game(body: GameCreate, service: Service, lock: Lock) -> GameState:
+async def create_game(
+    body: GameCreate, service: Service, lock: Lock, settings: Config
+) -> GameState:
     async with lock:
         try:
             loaded = await service.create(
@@ -112,31 +115,40 @@ async def create_game(body: GameCreate, service: Service, lock: Lock) -> GameSta
             )
         except _ERRORS as exc:
             raise _http_error(exc) from exc
-    return GameState.from_loaded(loaded)
+    return GameState.from_loaded(loaded, think_scale=settings.bot_think_scale)
 
 
 @router.get("/games/{game_id}")
-def get_game(game_id: int, repo: Repo) -> GameState:
+def get_game(game_id: int, repo: Repo, settings: Config) -> GameState:
     try:
-        return GameState.from_loaded(repo.load(game_id), repo.analysis_status(game_id))
+        return GameState.from_loaded(
+            repo.load(game_id), repo.analysis_status(game_id), settings.bot_think_scale
+        )
     except _ERRORS as exc:
         raise _http_error(exc) from exc
 
 
 @router.post("/games/{game_id}/moves")
-async def play_move(game_id: int, body: MoveCreate, service: Service, lock: Lock) -> GameState:
+async def play_move(
+    game_id: int, body: MoveCreate, service: Service, lock: Lock, settings: Config
+) -> GameState:
+    """The bot's reply comes in the same response, at once: the frontend shows the minimum
+    "thinking" time (`bot_think`, SPEC §1.1)."""
     async with lock:
         try:
-            return GameState.from_loaded(await service.play(game_id, body.uci))
+            loaded = await service.play(game_id, body.uci)
+            return GameState.from_loaded(loaded, think_scale=settings.bot_think_scale)
         except _ERRORS as exc:
             raise _http_error(exc) from exc
 
 
 @router.post("/games/{game_id}/undo")
-async def undo(game_id: int, service: Service, lock: Lock) -> GameState:
+async def undo(game_id: int, service: Service, lock: Lock, settings: Config) -> GameState:
     async with lock:
         try:
-            return GameState.from_loaded(service.undo(game_id))
+            return GameState.from_loaded(
+                service.undo(game_id), think_scale=settings.bot_think_scale
+            )
         except _ERRORS as exc:
             raise _http_error(exc) from exc
 
@@ -152,10 +164,12 @@ async def hint(game_id: int, service: Service, lock: Lock) -> HintRead:
 
 
 @router.post("/games/{game_id}/resign")
-async def resign(game_id: int, service: Service, lock: Lock) -> GameState:
+async def resign(game_id: int, service: Service, lock: Lock, settings: Config) -> GameState:
     async with lock:
         try:
-            return GameState.from_loaded(service.resign(game_id))
+            return GameState.from_loaded(
+                service.resign(game_id), think_scale=settings.bot_think_scale
+            )
         except _ERRORS as exc:
             raise _http_error(exc) from exc
 
@@ -176,7 +190,7 @@ async def offer_draw(
         accepted=declined is None,
         declined_reason=declined,
         min_moves=settings.draw_min_moves,
-        game=GameState.from_loaded(loaded),
+        game=GameState.from_loaded(loaded, think_scale=settings.bot_think_scale),
     )
 
 

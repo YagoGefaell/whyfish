@@ -9,6 +9,14 @@
   motor lo permita; por debajo del Elo mínimo soportado, `Skill Level` y tiempo/profundidad
   reducidos. Calibración en `config.py`.
 - Sin reloj ni control de tiempo (descartado: es una herramienta de aprendizaje).
+- **Tiempo de "pensar" mínimo del bot** (para que no responda de forma antinatural): por
+  nivel, aleatorio en un rango (`LevelPreset.think_min_s/think_max_s`): Principiante y Novato
+  0,8–1,6 s, Club 0,8–1,8 s, Fuerte y Máximo 0,5 s (solo si responden más rápido). El backend
+  devuelve la jugada al momento junto con el rango (`bot_think` en el estado de la partida,
+  escalado por `BOT_THINK_SCALE`; 0 en los tests); el frontend espera solo lo que falte (mínimo
+  menos lo que tardó la petición). Durante la espera tu jugada ya se ve en el tablero, la franja
+  del bot dice "pensando…" y no se puede mover. Sin espera al recargar ni al deshacer; si el bot
+  abre la partida (juegas con negras), espera solo el mínimo del rango.
 - Durante la partida: sin ayudas por defecto. Opciones activables: deshacer jugada,
   pista (muestra la pieza a mover, no la casilla destino).
 - Abandonar / ofrecer tablas. Fin por mate, ahogado, repetición, 50 jugadas, material insuficiente.

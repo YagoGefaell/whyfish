@@ -348,3 +348,24 @@ def test_commands_need_engine_but_reads_do_not(tmp_db_settings: Settings) -> Non
         assert c.get("/api/games").status_code == 200
         assert c.post(f"/api/games/{gid}/moves", json={"uci": "e2e4"}).status_code == 503
         assert c.post("/api/games", json={}).status_code == 503
+
+
+def test_bot_think_range_by_level(client: TestClient) -> None:
+    """SPEC §1.1: the frontend waits for the bot's reply at least this long (random in range)."""
+    club = client.post("/api/games", json={"color": "white", "level": "club"}).json()
+    assert club["bot_think"] == {"min_s": 0.8, "max_s": 1.8}
+    novice = client.post("/api/games", json={"color": "white", "level": "novice"}).json()
+    assert novice["bot_think"] == {"min_s": 0.8, "max_s": 1.6}
+    strong = client.post("/api/games", json={"color": "white", "level": "strong"}).json()
+    assert strong["bot_think"] == {"min_s": 0.5, "max_s": 0.5}
+
+
+def test_bot_think_scale_zero_turns_it_off(fake_engine: FakeEngine) -> None:
+    app = create_app(
+        make_settings(bot_think_scale=0.0),
+        engine_factory=factory_for(fake_engine),
+        analysis_engine_factory=factory_for(fake_engine),
+    )
+    with TestClient(app) as client:
+        game = client.post("/api/games", json={"color": "white", "level": "beginner"}).json()
+        assert game["bot_think"] == {"min_s": 0.0, "max_s": 0.0}
