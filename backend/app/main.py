@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.analysis.runner import AnalysisService
-from app.api import analysis, games, health
+from app.api import analysis, games, health, why
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
 from app.engine.pool import PoolManager
@@ -66,6 +66,7 @@ def create_app(
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(games.router, prefix=API_PREFIX)
     app.include_router(analysis.router, prefix=API_PREFIX)
+    app.include_router(why.router, prefix=API_PREFIX)
     return app
 
 

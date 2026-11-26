@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     evaluate_time_s: float = 0.3
     evaluate_max_multipv: int = 5
     evaluate_line_plies: int = 6
+    # "Ver por qué" (Phase 5): search time of each extension of a line that is too short to
+    # reach its consequence point (one engine line, cached per position), and how long each
+    # step of the replay lasts in the browser.
+    why_extend_time_s: float = 0.2
+    why_step_ms: int = 1000
 
     # --- Storage ----------------------------------------------------------
     database_url: str = f"sqlite:///{REPO_ROOT / 'data' / 'whyfish.db'}"
@@ -191,6 +196,10 @@ class FactThresholds:
     # A gain or loss is stated in the level-1 text only if its consequence point is within
     # this many plies of the line: the same limit as "Ver por qué", which replays up to it.
     consequence_text_max_plies: int = 20
+    # "Ver por qué": plies without material change required after the consequence point (not
+    # for mate), and plies replayed when there is no clear consequence.
+    why_stable_plies: int = 4
+    why_quiet_plies: int = 8
 
 
 FACTS = FactThresholds()

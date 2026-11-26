@@ -211,9 +211,7 @@ def level1(
             c = pl.consequence
             loss = es.exchange(c.lost, c.won) if c.settled and c.lost else _loss(idea.gain, None)
             worse = _eval_clause(facts, idea.gain)
-            return (
-                f"Esta jugada pierde {loss}: la refutación empieza con {reply}{worse}.{better}"
-            )
+            return f"Esta jugada pierde {loss}: la refutación empieza con {reply}{worse}.{better}"
 
         case K.MISSED_GAIN:
             assert best is not None and bl is not None

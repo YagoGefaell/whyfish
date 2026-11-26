@@ -148,3 +148,36 @@ def more(points: int) -> str:
     if points == 2:
         return "dos peones más"
     return "más " + material(points)
+
+
+def bare(names: tuple[str, ...]) -> str:
+    """Pieces without articles: 'torre y caballo', 'dos peones', 'torre y peón'."""
+    groups: list[tuple[str, int]] = []
+    for name in names:
+        if groups and groups[-1][0] == name:
+            groups[-1] = (name, groups[-1][1] + 1)
+        else:
+            groups.append((name, 1))
+    parts: list[str] = []
+    for name, count in groups:
+        noun = _PIECES[name][0]
+        if count > 1:
+            plural = noun.replace("ó", "o") + ("es" if noun.endswith(("n", "l")) else "s")
+            parts.append(f"{_NUMBERS.get(count, str(count))} {plural}")
+        else:
+            parts.append(noun)
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " y " + parts[-1]
+
+
+def pawns_difference(points: int) -> str:
+    """'(un peón de diferencia)', '(unos 4 peones de diferencia)'."""
+    n = abs(points)
+    return "(un peón de diferencia)" if n == 1 else f"(unos {n} peones de diferencia)"
+
+
+def type_name(name: str) -> str:
+    return _PIECES[name][0]
+
+
+def type_feminine(name: str) -> bool:
+    return _PIECES[name][1] == "f"

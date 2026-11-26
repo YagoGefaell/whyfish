@@ -253,6 +253,34 @@ def nd6_excellent() -> MoveFacts:
     )
 
 
+# Acceptance fixture of Phase 5: 1.a3?? (Qxd4 wins the knight) Re1+ 2.Kh2 Nf3+ 3.Kh3 Nxh4
+# 4.Kxh4: the queen is lost three moves later, then recaptured.
+QUEEN_LATER = "4r1k1/5ppp/8/8/3n3Q/8/PP3P2/6K1 w - - 0 1"
+QUEEN_LATER_LINE = [
+    "a2a3",
+    "e8e1",
+    "g1h2",
+    "d4f3",
+    "h2h3",
+    "f3h4",
+    "h3h4",
+    "g8f8",
+    "a3a4",
+    "f8e7",
+    "a4a5",
+]
+
+
+def queen_lost_later(plies: int = len(QUEEN_LATER_LINE)) -> MoveFacts:
+    return make_facts(
+        QUEEN_LATER,
+        "a2a3",
+        [line("h4d4", "g8f8", cp=300), line(*QUEEN_LATER_LINE[:plies], cp=-600)],
+        [line(*QUEEN_LATER_LINE[1:plies], cp=600)],
+        C.BLUNDER,
+    )
+
+
 BD2_IN_CHECK = "rn1qk2r/ppp2ppp/4p1B1/3n4/1b1P4/4PN2/PP3PPP/RNBQK2R w KQkq - 1 8"
 
 

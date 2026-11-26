@@ -11,11 +11,13 @@ import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 
+import chess
 import chess.engine
 from sqlalchemy import Engine as DbEngine
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
-from app.analysis.positions import GamePosition, game_positions
+from app.analysis.positions import GamePosition, engine_board, game_positions, position_key
 from app.analysis.types import EngineLine, PositionEval
 from app.config import Settings
 from app.engine.pool import EnginePool, PoolManager
@@ -110,6 +112,28 @@ class AnalysisService:
         await asyncio.gather(*self._tasks.values(), return_exceptions=True)
 
     # --- Queries ----------------------------------------------------------
+
+    async def extend(
+        self,
+        board: chess.Board,
+        ucis: Sequence[str],
+        needs_more: Callable[[chess.Board, Sequence[str]], bool],
+        max_plies: int,
+    ) -> tuple[str, ...]:
+        """`extend_line` with this service's pools, cache and engine."""
+        name = self._engine_name()
+        if name is None:
+            raise AnalysisEngineUnavailableError("El motor no está disponible.")
+        return await extend_line(
+            board,
+            ucis,
+            needs_more=needs_more,
+            pools=self._pools,
+            db=self._db,
+            settings=self._settings,
+            engine_name=name,
+            max_plies=max_plies,
+        )
 
     def job(self, game_id: int) -> AnalysisJob | None:
         with Session(self._db) as session:
@@ -262,3 +286,57 @@ class AnalysisService:
             session.commit()
         async with self._changed:
             self._changed.notify_all()
+
+
+def extension_key(engine_name: str, settings: Settings) -> str:
+    """Cache key of the short searches that extend lines for "Ver por qué"."""
+    return f"{engine_name}|why|t={settings.why_extend_time_s}|mpv=1"
+
+
+async def extend_line(
+    board: chess.Board,
+    ucis: Sequence[str],
+    *,
+    needs_more: Callable[[chess.Board, Sequence[str]], bool],
+    pools: PoolManager,
+    db: DbEngine,
+    settings: Settings,
+    engine_name: str,
+    max_plies: int,
+) -> tuple[str, ...]:
+    """Extend `ucis` (played from `board`) with the engine while `needs_more` says the line is
+    too short, up to `max_plies`. Each search is cached like any position analysis (its own
+    settings key), so the same sequence comes back every time."""
+    line = list(ucis)
+    key = extension_key(engine_name, settings)
+    limit = chess.engine.Limit(time=settings.why_extend_time_s)
+    while len(line) < max_plies and needs_more(board, line):
+        end = board.copy(stack=False)
+        for uci in line:
+            end.push_uci(uci)
+        if end.is_game_over():
+            break
+        root = engine_board(end)
+        pkey = position_key(root)
+        with Session(db) as session:
+            row = session.exec(
+                select(PositionAnalysis).where(
+                    PositionAnalysis.key == pkey, PositionAnalysis.settings_key == key
+                )
+            ).first()
+            cached = lines_from_json(row.lines_json) if row is not None else None
+        if cached is None:
+            async with pools.use() as pool, pool.acquire() as engine:
+                cached = await engine.analyse(root, limit, 1)
+            with Session(db) as session, contextlib.suppress(IntegrityError):
+                # Another request may have cached the same position meanwhile: keep theirs.
+                session.add(
+                    PositionAnalysis(
+                        key=pkey, settings_key=key, fen=end.fen(), lines_json=lines_to_json(cached)
+                    )
+                )
+                session.commit()
+        if not cached or not cached[0].moves:
+            break
+        line.extend(cached[0].moves)
+    return tuple(line[:max_plies])
