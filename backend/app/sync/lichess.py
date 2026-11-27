@@ -67,8 +67,9 @@ async def fetch_games(
     since: datetime | None,
     until: datetime | None,
     retry_wait_s: float,
-) -> AsyncIterator[OnlineGame]:
-    """Games of `username` started in [since, until) (aware UTC), oldest first."""
+) -> AsyncIterator[OnlineGame | None]:
+    """Games of `username` started in [since, until) (aware UTC), oldest first. None for a game
+    that is discarded (variant, against the AI...), so that it can be counted."""
     params: dict[str, str] = {
         "pgnInJson": "true",
         "clocks": "true",
@@ -94,8 +95,6 @@ async def fetch_games(
             async for line in response.aiter_lines():
                 if not line.strip():
                     continue
-                game = parse_game(json.loads(line), base_url)
-                if game is not None:
-                    yield game
+                yield parse_game(json.loads(line), base_url)
             return
     raise SyncError("Lichess limita las peticiones: inténtalo dentro de un rato.")

@@ -2,7 +2,9 @@
 
 Most recent game first. A game the user opens is analysed in the foreground (it goes first:
 its positions get engines before the queue's). Failed games are retried once. The queue can
-be paused (persisted, survives restarts) and leaves `queue_reserved_engines` free.
+be paused (persisted, survives restarts): it stops after the positions being searched and,
+when resumed, goes on with the same game from the cache. It leaves `queue_reserved_engines`
+engines free.
 """
 
 import asyncio
@@ -61,6 +63,8 @@ class AnalysisQueue:
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
         self._current: int | None = None
+        self._paused: bool | None = None  # in memory once read (checked for every position)
+        self._resume: int | None = None  # game interrupted by a pause: next on resume
 
     # --- Control ------------------------------------------------------------
 
@@ -81,10 +85,15 @@ class AnalysisQueue:
 
     @property
     def paused(self) -> bool:
-        return get_setting(self._db, QUEUE_PAUSED, "0") == "1"
+        if self._paused is None:
+            self._paused = get_setting(self._db, QUEUE_PAUSED, "0") == "1"
+        return self._paused
 
     def set_paused(self, paused: bool) -> None:
+        """Pausing stops the current game after the positions being searched; resuming goes on
+        with that same game (its finished positions are in the cache)."""
         set_setting(self._db, QUEUE_PAUSED, "1" if paused else "0")
+        self._paused = paused
         if not paused:
             self.wake()
 
@@ -116,6 +125,8 @@ class AnalysisQueue:
     def next_game(self) -> int | None:
         with Session(self._db) as session:
             waiting = _waiting(session)
+        if self._resume is not None and self._resume in waiting:
+            return self._resume
         return waiting[0] if waiting else None
 
     async def _loop(self) -> None:
@@ -127,7 +138,8 @@ class AnalysisQueue:
                 continue
             self._current = game_id
             try:
-                await self._service.analyse_background(game_id)
+                outcome = await self._service.analyse_background(game_id, lambda: self.paused)
+                self._resume = game_id if outcome == "paused" else None
             except AnalysisEngineUnavailableError:
                 # No engine: wait for the next sync or resume instead of spinning.
                 logger.warning("Analysis queue: no engine available")

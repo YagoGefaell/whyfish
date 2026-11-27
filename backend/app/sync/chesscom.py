@@ -40,6 +40,10 @@ def _start(pgn: str, end_time: int) -> datetime:
     return datetime.fromtimestamp(end_time, UTC)
 
 
+def _end(data: dict[str, Any]) -> datetime:
+    return datetime.fromtimestamp(int(data.get("end_time", 0)), UTC)
+
+
 def parse_game(data: dict[str, Any]) -> OnlineGame | None:
     """One game of a monthly archive; None for variants and games without a PGN."""
     if data.get("rules") != "chess" or not data.get("pgn"):
@@ -93,8 +97,9 @@ async def fetch_games(
     since: datetime | None,
     until: datetime | None,
     retry_wait_s: float,
-) -> AsyncIterator[OnlineGame]:
-    """Games of `username` started in [since, until) (aware UTC), oldest first."""
+) -> AsyncIterator[OnlineGame | None]:
+    """Games of `username` started in [since, until) (aware UTC), oldest first. None for a game
+    of the range that is discarded (variant...), so that it can be counted."""
     base = f"{base_url.rstrip('/')}/pub/player/{username.lower()}"
     response = await _get(client, f"{base}/games/archives", retry_wait_s)
     if response.status_code == 404:
@@ -115,10 +120,10 @@ async def fetch_games(
         games = sorted(page.json().get("games", []), key=lambda g: int(g.get("end_time", 0)))
         for data in games:
             game = parse_game(data)
-            if game is None:
+            # The range is decided by the end time for discarded games (no start time parsed).
+            moment = game.played_at if game else _end(data)
+            if since is not None and moment < since:
                 continue
-            if since is not None and game.played_at < since:
-                continue
-            if until is not None and game.played_at >= until:
+            if until is not None and moment >= until:
                 continue
             yield game

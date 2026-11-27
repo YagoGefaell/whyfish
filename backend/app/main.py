@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.analysis.book import default_book
 from app.analysis.queue import AnalysisQueue
 from app.analysis.runner import AnalysisService
 from app.api import analysis, games, health, sync, why
@@ -62,9 +63,13 @@ def create_app(
             db_engine, resolved_settings, sync_client_factory, on_imported=queue.wake
         )
         queue.start()
+        # The openings book takes ~2 s to build: load it now, in a thread, so the first review
+        # does not wait for it (lru_cache keeps it for every later call).
+        book_loading = asyncio.create_task(asyncio.to_thread(default_book))
         try:
             yield
         finally:
+            await book_loading
             await app.state.sync_service.stop()
             await queue.stop()
             await analysis_service.shutdown()

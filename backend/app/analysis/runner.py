@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable, Sequence
+from typing import Literal
 
 import chess
 import chess.engine
@@ -55,23 +56,32 @@ async def evaluate_positions(
     on_result: Callable[[GamePosition, tuple[EngineLine, ...]], Awaitable[None] | None],
     priority: Callable[[], int] = lambda: FOREGROUND,
     concurrency: int | None = None,
+    stop: Callable[[], bool] = lambda: False,
 ) -> None:
     """Analyse `positions` in parallel with the pool; call `on_result` as each one finishes.
 
     `priority` is asked for each position (a background analysis may be promoted while it
     runs); `concurrency` caps how many engines it uses at once (the background queue leaves
-    some free for interactive use).
+    some free for interactive use); once `stop()` is true no new position starts (the ones
+    being searched finish and are reported, so a paused analysis resumes from the cache).
     """
     gate = asyncio.Semaphore(concurrency) if concurrency else contextlib.nullcontext()
 
     async def work(position: GamePosition) -> None:
-        async with gate, pool.acquire(priority()) as engine:
-            lines = await engine.analyse(position.board, limit, multipv)
+        async with gate:
+            if stop():
+                return
+            async with pool.acquire(priority()) as engine:
+                lines = await engine.analyse(position.board, limit, multipv)
         maybe = on_result(position, lines)
         if maybe is not None:
             await maybe
 
     await asyncio.gather(*(work(p) for p in positions))
+
+
+class AnalysisPaused(Exception):
+    """The background queue was paused in the middle of a game."""
 
 
 class AnalysisNotReadyError(Exception):
@@ -251,9 +261,13 @@ class AnalysisService:
         self._tasks[game_id] = asyncio.create_task(self._run(game_id, key))
         return job
 
-    async def analyse_background(self, game_id: int) -> bool:
-        """Analyse a game for the background queue (lower priority, fewer engines). Returns
-        whether it ended DONE. Counts the attempt (a failed game is retried once)."""
+    async def analyse_background(
+        self, game_id: int, stop: Callable[[], bool] = lambda: False
+    ) -> Literal["done", "failed", "paused", "skipped"]:
+        """Analyse a game for the background queue (lower priority, fewer engines). Counts the
+        attempt (a failed game is retried once). `stop()` pauses it after the positions being
+        searched (unless the user opened the game meanwhile): the job is dropped, as if never
+        tried, and the positions already done stay in the cache."""
         name = self._engine_name()
         if name is None:
             raise AnalysisEngineUnavailableError("El motor no está disponible.")
@@ -263,7 +277,7 @@ class AnalysisService:
             if job is None:
                 job = AnalysisJob(game_id=game_id, settings_key=key, status=AnalysisStatus.PENDING)
             elif job.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING):
-                return False  # the user started it meanwhile
+                return "skipped"  # the user started it meanwhile
             job.settings_key = key
             job.status = AnalysisStatus.PENDING
             job.done = job.total = 0
@@ -273,15 +287,30 @@ class AnalysisService:
             session.add(job)
             session.commit()
         self._background.add(game_id)
+
+        def paused() -> bool:
+            return stop() and game_id not in self._promoted
+
         try:
-            await self._analyse(game_id, key, background=True)
-            return True
+            await self._analyse(game_id, key, background=True, stop=paused)
+            return "done"
+        except AnalysisPaused:
+            with Session(self._db) as session:
+                job = session.exec(
+                    select(AnalysisJob).where(AnalysisJob.game_id == game_id)
+                ).first()
+                if job is not None:
+                    session.delete(job)
+                    session.commit()
+            async with self._changed:
+                self._changed.notify_all()
+            return "paused"
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logger.exception("Background analysis of game %s failed", game_id)
             await self._update(game_id, status=AnalysisStatus.FAILED, error=f"Error: {exc}")
-            return False
+            return "failed"
         finally:
             self._background.discard(game_id)
             self._promoted.discard(game_id)
@@ -298,7 +327,13 @@ class AnalysisService:
         finally:
             self._tasks.pop(game_id, None)
 
-    async def _analyse(self, game_id: int, key: str, background: bool = False) -> None:
+    async def _analyse(
+        self,
+        game_id: int,
+        key: str,
+        background: bool = False,
+        stop: Callable[[], bool] = lambda: False,
+    ) -> None:
         with Session(self._db) as session:
             loaded = GameRepository(session).load(game_id)
             positions = game_positions(loaded.game.initial_fen, [m.uci for m in loaded.moves])
@@ -346,7 +381,10 @@ class AnalysisService:
                     save,
                     priority=priority,
                     concurrency=max(1, pool.size - reserved) if background else None,
+                    stop=stop,
                 )
+            if done < len(todo):
+                raise AnalysisPaused()
         await self._update(game_id, status=AnalysisStatus.DONE, finished=True)
 
     async def _update(

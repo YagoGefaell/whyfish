@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 ClientFactory = Callable[[], httpx.AsyncClient]
 Fetch = Callable[
     [httpx.AsyncClient, str, str, datetime | None, datetime | None, float],
-    AsyncIterator[OnlineGame],
+    AsyncIterator[OnlineGame | None],
 ]
 
 
@@ -53,7 +53,8 @@ class AccountProgress:
     username: str
     state: str = "waiting"  # waiting | running | done | error
     imported: int = 0
-    skipped: int = 0  # already stored, variants, or the user is not one of the players
+    # Discarded on download (variants...), already stored, or the user is not a player.
+    skipped: int = 0
     error: str | None = None
 
 
@@ -193,7 +194,9 @@ class SyncService:
             async for game in fetch(
                 client, base_url, progress.username, since, until, self._settings.sync_retry_wait_s
             ):
-                if self._store(game, progress.username):
+                if game is None:
+                    progress.skipped += 1  # discarded on download (variant, AI opponent...)
+                elif self._store(game, progress.username):
                     progress.imported += 1
                     self._advance(progress.platform, game.played_at, older)
                     self._on_imported()

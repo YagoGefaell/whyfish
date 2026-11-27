@@ -91,7 +91,8 @@ def test_first_sync_last_months_then_incremental_then_older(
     client.put("/api/accounts", json={"lichess": "yago"})  # case-insensitive
 
     state = sync(client)
-    assert state["accounts"][0]["imported"] == 1  # only the last 6 months; the variant skipped
+    assert state["accounts"][0]["imported"] == 1  # only the last 6 months
+    assert state["accounts"][0]["skipped"] == 1  # the variant, discarded on download
     [game] = games(client)
     assert (game["platform"], game["player_color"], game["time_class"]) == (
         "lichess",
@@ -139,7 +140,8 @@ def test_chesscom_by_month_and_filters(client: TestClient, platforms: FakePlatfo
     }
     client.put("/api/accounts", json={"chesscom": "Yago"})
     progress = sync(client)["accounts"][0]
-    assert (progress["imported"], progress["skipped"]) == (1, 1)  # the 960 game never arrives
+    # The 960 game (discarded on download) and the game of two other players are counted.
+    assert (progress["imported"], progress["skipped"]) == (1, 2)
     assert len(games(client, platform="chesscom", time_class="rapid", result="win")) == 1
     assert games(client, platform="lichess") == []
     assert games(client, color="black") == []
@@ -219,3 +221,74 @@ def test_failed_games_are_retried_once(tmp_path: Path) -> None:
         )
         session.commit()
         assert _waiting(session) == [ids[0], ids[1]]  # the twice-failed game is given up
+
+
+async def test_pause_stops_after_the_positions_in_flight() -> None:
+    import asyncio
+
+    import chess
+    import chess.engine
+
+    from app.analysis.positions import game_positions
+    from app.analysis.runner import evaluate_positions
+    from app.engine.pool import EnginePool
+
+    positions = game_positions(chess.STARTING_FEN, ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5"])
+    pool = EnginePool([FakeEngine()])
+    done: list[int] = []
+    paused = False
+
+    def save(position: Any, lines: Any) -> None:
+        nonlocal paused
+        done.append(position.ply)
+        paused = True  # the user pauses while the first position is being searched
+
+    await evaluate_positions(
+        positions,
+        pool,
+        chess.engine.Limit(time=0.01),
+        1,
+        save,
+        concurrency=1,
+        stop=lambda: paused,
+    )
+    await asyncio.sleep(0)
+    assert done == [0]  # nothing new started after the pause
+
+
+def test_resume_goes_on_with_the_interrupted_game(tmp_path: Path) -> None:
+    from app.analysis.queue import AnalysisQueue
+    from app.db import init_db, make_db_engine
+    from app.models.game import Game
+    from app.play.rules import PlayerColor
+
+    db = make_db_engine(f"sqlite:///{tmp_path / 'r.db'}")
+    init_db(db)
+    with Session(db) as session:
+        ids = []
+        for i in range(2):
+            game = Game(
+                player_color=PlayerColor.WHITE,
+                platform="lichess",
+                external_id=str(i),
+                played_at=NOW - timedelta(days=i),
+                result="1-0",
+            )
+            session.add(game)
+            session.flush()
+            assert game.id is not None
+            ids.append(game.id)
+        session.commit()
+    queue = AnalysisQueue(db, make_settings(), service=None)  # type: ignore[arg-type]
+    assert queue.next_game() == ids[0]  # most recent first
+    queue._resume = ids[1]  # it was paused in the middle of the older one
+    assert queue.next_game() == ids[1]
+
+
+def test_opening_book_is_loaded_at_startup(client: TestClient) -> None:
+    from app.analysis.book import default_book
+
+    deadline = time.monotonic() + 15
+    while default_book.cache_info().currsize == 0 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert default_book.cache_info().currsize == 1
