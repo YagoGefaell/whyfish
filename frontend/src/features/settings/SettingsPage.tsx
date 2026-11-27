@@ -1,10 +1,12 @@
-import { History, Save } from 'lucide-react'
-import { useEffect, useState, type SyntheticEvent } from 'react'
-import { ApiError } from '../../api/client'
+import { History } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { syncApi, type Account, type Accounts } from '../../api/sync'
 import { trainingApi, type TrainingSettings } from '../../api/training'
 import { PLATFORM_LABEL, useSync } from '../sync/useSync'
 import { SyncProgress } from '../sync/SyncProgress'
+import { SaveNote } from '../../components/SaveNote'
+import { useAutoSave } from '../../lib/useAutoSave'
+import { AppearanceSettings } from './AppearanceSettings'
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('es-ES') : '—')
 
@@ -28,35 +30,37 @@ function AccountStatus({ account }: { account: Account }) {
   )
 }
 
-/** Training settings (phase 6c): session size, weak-point share of new ones, bullet games. */
+/** Training settings (phase 6c): saved when changed (numbers after a short pause). */
 function TrainingSettingsForm() {
   const [s, setS] = useState<TrainingSettings | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
+  const value = useRef<TrainingSettings | null>(null)
+  const { status, schedule, flush } = useAutoSave(async () => {
+    if (value.current) await trainingApi.saveSettings(value.current)
+  }, 600)
   useEffect(() => {
     trainingApi
       .settings()
-      .then(setS)
+      .then((loaded) => {
+        value.current = loaded
+        setS(loaded)
+      })
       .catch(() => {
         // The section stays hidden.
       })
   }, [])
   if (!s) return null
-  const save = (event: SyntheticEvent) => {
-    event.preventDefault()
-    setSaved(null)
-    trainingApi
-      .saveSettings(s)
-      .then((next) => {
-        setS(next)
-        setSaved('Ajustes de entrenamiento guardados.')
-      })
-      .catch(() => {
-        setSaved('No se pudieron guardar.')
-      })
+  const change = (next: TrainingSettings, now: boolean) => {
+    value.current = next
+    setS(next)
+    if (now) flush()
+    else schedule()
   }
   return (
-    <form onSubmit={save} className="panel flex flex-col gap-3 p-6" aria-label="Entrenamiento">
-      <h3 className="font-semibold">Entrenamiento</h3>
+    <section className="panel flex flex-col gap-3 p-6" aria-label="Entrenamiento">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-semibold">Entrenamiento</h3>
+        <SaveNote status={status} />
+      </div>
       <label className="flex items-center justify-between gap-3">
         <span>Ejercicios por sesión diaria</span>
         <input
@@ -66,7 +70,7 @@ function TrainingSettingsForm() {
           className="field w-20"
           value={s.session_size}
           onChange={(e) => {
-            setS({ ...s, session_size: Number(e.target.value) })
+            change({ ...s, session_size: Number(e.target.value) }, false)
           }}
         />
       </label>
@@ -79,7 +83,7 @@ function TrainingSettingsForm() {
           className="field w-20"
           value={s.weak_new}
           onChange={(e) => {
-            setS({ ...s, weak_new: Number(e.target.value) })
+            change({ ...s, weak_new: Number(e.target.value) }, false)
           }}
         />
       </label>
@@ -88,7 +92,7 @@ function TrainingSettingsForm() {
           type="checkbox"
           checked={s.include_bullet}
           onChange={(e) => {
-            setS({ ...s, include_bullet: e.target.checked })
+            change({ ...s, include_bullet: e.target.checked }, true)
           }}
         />
         Incluir errores de partidas bala
@@ -98,7 +102,7 @@ function TrainingSettingsForm() {
           type="checkbox"
           checked={s.include_bot}
           onChange={(e) => {
-            setS({ ...s, include_bot: e.target.checked })
+            change({ ...s, include_bot: e.target.checked }, true)
           }}
         />
         <span>
@@ -108,59 +112,60 @@ function TrainingSettingsForm() {
           </span>
         </span>
       </label>
-      {saved && <p role="status">{saved}</p>}
-      <button type="submit" className="btn self-start">
-        <Save size={16} /> Guardar
-      </button>
-    </form>
+    </section>
   )
 }
 
-/** Ajustes: Lichess / Chess.com accounts (phase 6a), training (phase 6c). */
+/** Ajustes: accounts (phase 6a), appearance (phase 6.5), training (phase 6c). Everything is
+ * saved without a button. */
 export function SettingsPage() {
   const [data, setData] = useState<Accounts | null>(null)
-  const [lichess, setLichess] = useState('')
-  const [chesscom, setChesscom] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [names, setNames] = useState({ lichess: '', chesscom: '' })
+  const [loadError, setLoadError] = useState(false)
+  // What the backend has: an account is validated and saved only when its value changed.
+  const saved = useRef({ lichess: '', chesscom: '' })
+  const typed = useRef(names)
 
   const load = (accounts: Accounts) => {
+    const next = {
+      lichess: accounts.accounts.find((a) => a.platform === 'lichess')?.username ?? '',
+      chesscom: accounts.accounts.find((a) => a.platform === 'chesscom')?.username ?? '',
+    }
+    // A field the user has edited since the last save keeps what is typed; the rest take the
+    // backend's value.
+    const before = saved.current
+    const edited = (key: 'lichess' | 'chesscom') =>
+      typed.current[key].trim() !== before[key] && typed.current[key].trim() !== next[key]
+    const merged = {
+      lichess: edited('lichess') ? typed.current.lichess : next.lichess,
+      chesscom: edited('chesscom') ? typed.current.chesscom : next.chesscom,
+    }
+    saved.current = next
+    typed.current = merged
+    setNames(merged)
     setData(accounts)
-    setLichess(accounts.accounts.find((a) => a.platform === 'lichess')?.username ?? '')
-    setChesscom(accounts.accounts.find((a) => a.platform === 'chesscom')?.username ?? '')
   }
   const reload = () => {
     syncApi
       .accounts()
       .then(load)
       .catch(() => {
-        setMessage({ ok: false, text: 'No se pudieron cargar los ajustes.' })
+        setLoadError(true)
       })
   }
   useEffect(reload, [])
   const sync = useSync(reload)
 
-  const save = (event: SyntheticEvent) => {
-    event.preventDefault()
-    setSaving(true)
-    setMessage(null)
-    syncApi
-      .saveAccounts(lichess, chesscom)
-      .then((accounts) => {
-        load(accounts)
-        setMessage({ ok: true, text: 'Cuentas guardadas.' })
-      })
-      .catch((err: unknown) => {
-        setMessage({
-          ok: false,
-          text: err instanceof ApiError ? err.message : 'No se pudieron guardar.',
-        })
-      })
-      .finally(() => {
-        setSaving(false)
-      })
-  }
+  const changed = () =>
+    typed.current.lichess.trim() !== saved.current.lichess ||
+    typed.current.chesscom.trim() !== saved.current.chesscom
+  const accounts = useAutoSave(async () => {
+    if (!changed()) return
+    const { lichess, chesscom } = typed.current
+    load(await syncApi.saveAccounts(lichess.trim(), chesscom.trim()))
+  }, 1200)
 
+  if (loadError && !data) return <p className="text-danger">No se pudieron cargar los ajustes.</p>
   if (!data) return <p className="text-muted">Cargando ajustes…</p>
   const account = (platform: Account['platform']) =>
     data.accounts.find((a) => a.platform === platform)
@@ -168,45 +173,47 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <form onSubmit={save} className="panel flex flex-col gap-4 p-6">
-        <h2 className="text-xl font-semibold">Ajustes</h2>
-        <section className="flex flex-col gap-3">
+      <h2 className="text-xl font-semibold">Ajustes</h2>
+      <section className="panel flex flex-col gap-3 p-6" aria-label="Tus cuentas">
+        <div className="flex items-baseline justify-between gap-3">
           <h3 className="font-semibold">Tus cuentas</h3>
-          <p className="text-sm text-muted">
-            Tus partidas de Lichess y Chess.com se importan desde el Historial («Sincronizar»). La
-            primera vez, las de los últimos {data.sync_months} meses.
-          </p>
-          {(['lichess', 'chesscom'] as const).map((platform) => {
-            const current = account(platform)
-            return (
-              <div key={platform} className="flex flex-col gap-1">
-                <label className="flex flex-col gap-1">
-                  <span className="font-medium">Usuario de {PLATFORM_LABEL[platform]}</span>
-                  <input
-                    className="field"
-                    value={platform === 'lichess' ? lichess : chesscom}
-                    onChange={(e) => {
-                      ;(platform === 'lichess' ? setLichess : setChesscom)(e.target.value)
-                    }}
-                    placeholder="Sin cuenta"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </label>
-                {current && <AccountStatus account={current} />}
-              </div>
-            )
-          })}
-        </section>
-        {message && (
-          <p role={message.ok ? 'status' : 'alert'} className={message.ok ? '' : 'text-danger'}>
-            {message.text}
-          </p>
-        )}
-        <button type="submit" className="btn-primary self-start" disabled={saving || running}>
-          <Save size={16} /> Guardar
-        </button>
-      </form>
+          <SaveNote status={accounts.status} />
+        </div>
+        <p className="text-sm text-muted">
+          Tus partidas de Lichess y Chess.com se importan desde el Historial («Sincronizar»). La
+          primera vez, las de los últimos {data.sync_months} meses.
+        </p>
+        {(['lichess', 'chesscom'] as const).map((platform) => {
+          const current = account(platform)
+          return (
+            <div key={platform} className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1">
+                <span className="font-medium">Usuario de {PLATFORM_LABEL[platform]}</span>
+                <input
+                  className="field"
+                  value={names[platform]}
+                  disabled={running}
+                  onChange={(e) => {
+                    const next = { ...typed.current, [platform]: e.target.value }
+                    typed.current = next
+                    setNames(next)
+                    if (changed()) accounts.schedule()
+                  }}
+                  onBlur={() => {
+                    if (changed()) accounts.flush()
+                  }}
+                  placeholder="Sin cuenta"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              {current && <AccountStatus account={current} />}
+            </div>
+          )
+        })}
+      </section>
+
+      <AppearanceSettings />
 
       <TrainingSettingsForm />
 

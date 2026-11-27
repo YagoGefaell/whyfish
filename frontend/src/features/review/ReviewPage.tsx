@@ -65,7 +65,7 @@ function ReviewLoader({ gameId, factory }: { gameId: number; factory?: EventSour
             <>
               {meta}
               {warnings.map((w) => (
-                <p key={w} role="note" className="text-[#f7c631]">
+                <p key={w} role="note" className="text-warn">
                   {w}
                 </p>
               ))}

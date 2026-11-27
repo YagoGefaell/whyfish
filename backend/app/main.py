@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from app.analysis.book import default_book
 from app.analysis.queue import AnalysisQueue
 from app.analysis.runner import AnalysisService
-from app.api import analysis, games, health, stats, sync, training, why
+from app.api import analysis, games, health, stats, sync, training, ui_settings, why
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
 from app.engine.pool import PoolManager
@@ -96,6 +96,7 @@ def create_app(
     app.include_router(sync.router, prefix=API_PREFIX)
     app.include_router(stats.router, prefix=API_PREFIX)
     app.include_router(training.router, prefix=API_PREFIX)
+    app.include_router(ui_settings.router, prefix=API_PREFIX)
     return app
 
 

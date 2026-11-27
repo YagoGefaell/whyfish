@@ -20,5 +20,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'], // e2e/ is Playwright's
+    // The theme tokens are read as text by the contrast test.
+    css: { include: [/theme\/tokens\.css/] },
   },
 })

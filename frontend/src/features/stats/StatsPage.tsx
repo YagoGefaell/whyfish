@@ -59,7 +59,7 @@ function Bar({ value, max }: { value: number; max: number }) {
   return (
     <div className="h-2 w-full rounded-full bg-panel-2" aria-hidden="true">
       <div
-        className="h-2 rounded-full bg-[#ff9a3c]"
+        className="h-2 rounded-full bg-heat"
         style={{ width: `${String(max > 0 ? Math.max(4, (100 * value) / max) : 0)}%` }}
       />
     </div>
@@ -178,7 +178,7 @@ export function StatsPage() {
           {pending > 0 && ` Calculando los datos de ${String(pending)}…`}
         </p>
         {!s.enough && (
-          <p className="mt-1 flex items-center gap-1.5 text-[#f7c631]">
+          <p className="mt-1 flex items-center gap-1.5 text-warn">
             <TriangleAlert size={16} /> Son pocas para sacar conclusiones fiables (al menos{' '}
             {s.min_games}).
           </p>
@@ -306,7 +306,7 @@ export function StatsPage() {
                       </>
                     )}
                     {s.time.stands_out && (
-                      <span className="text-[#f7c631]"> El reloj te está costando partidas.</span>
+                      <span className="text-warn"> El reloj te está costando partidas.</span>
                     )}
                   </p>
                   <p className="text-xs text-muted">
@@ -349,7 +349,7 @@ export function StatsPage() {
                           {rows.map((o) => (
                             <tr
                               key={o.family}
-                              className={`border-t border-line ${o.worst ? 'text-[#f87171]' : ''}`}
+                              className={`border-t border-line ${o.worst ? 'text-bad' : ''}`}
                               data-worst={o.worst || undefined}
                             >
                               <td className="py-1.5">

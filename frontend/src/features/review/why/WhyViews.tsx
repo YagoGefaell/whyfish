@@ -4,8 +4,8 @@ import { MarkedParagraph } from '../MoveExplanation'
 import type { WhyPlayer } from './useWhyPlayer'
 
 const TONE = {
-  bad: { text: 'text-[#f87171]', bg: 'bg-[#dc2626]/20', ring: 'ring-[#dc2626]/60' },
-  good: { text: 'text-[#4ade80]', bg: 'bg-[#16a34a]/20', ring: 'ring-[#16a34a]/60' },
+  bad: { text: 'text-bad', bg: 'bg-bad-strong/20', ring: 'ring-bad-strong/60' },
+  good: { text: 'text-good', bg: 'bg-good-strong/20', ring: 'ring-good-strong/60' },
 } as const
 
 /** Caption of the current step (or of the start position), coloured on the consequence. */

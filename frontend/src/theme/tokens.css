@@ -1,0 +1,246 @@
+/*
+ * Design tokens: the only place with colours, fonts, radii and shadows. Components use the
+ * Tailwind utilities generated from them (bg-panel, text-muted, ...) or `var(--…)`; nothing
+ * else in src/ writes a colour.
+ *
+ * Two independent axes, both set on <html> by src/theme/prefs.ts from the Ajustes:
+ *   data-mode="dark|light"   the interface (dark: the defaults below; light: its block)
+ *   data-board="<board>"     board colours, highlights and arrows (brown: the defaults)
+ * Text contrast and highlight visibility are checked by src/theme/contrast.test.ts.
+ */
+@theme static {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Surfaces and text (dark mode) */
+  --color-bg: #131416;
+  --color-panel: #1b1c1f;
+  --color-panel-2: #232528;
+  --color-hover: #2c2e32;
+  --color-selected: #33363b;
+  --color-line: #2b2d31;
+  --color-fg: #e7e8ea;
+  --color-muted: #a0a3a9;
+  --color-faint: #6c7077;
+  --color-overlay: rgb(255 255 255 / 0.05);
+
+  /* Accent: a calm indigo (not green, not one of the warning or error hues) */
+  --color-accent: #8c9cf2;
+  --color-accent-strong: #a6b3f6;
+  --color-on-accent: #11131c;
+
+  /* Status: text tones (bad, good, warn) and strong tones for fills and rings */
+  --color-danger: #f17c74;
+  --color-bad: #f17c74;
+  --color-bad-strong: #dc3b33;
+  --color-good: #5ccf8a;
+  --color-good-strong: #23a05a;
+  --color-warn: #ecc350;
+  --color-attention: #e3a12f;
+  --color-heat: #f0904a;
+
+  /* Evaluation bar and graph */
+  --color-eval-white: #ededee;
+  --color-eval-black: #131416;
+  --color-eval-track: #2b2d31;
+  --color-eval-fill: #d5d6d9;
+  --color-eval-mid: #74777e;
+  --color-eval-ink: #1b1c1f;
+  --color-chart-line: var(--color-accent);
+  --color-chart-dot: #e7e8ea;
+
+  /*
+   * Move classifications: badge fill (the same in both modes, so a badge always looks the
+   * same; also the tint of the move's squares), the symbol drawn on it (ink), the badge
+   * outline, and the verdict text ("es un error"), readable on the panels. Inaccuracy, mistake
+   * and blunder are three clearly different hues: yellow, orange, red.
+   */
+  --color-cls-brilliant: #2fc9b4;
+  --color-cls-great: #3fb6ea;
+  --color-cls-best: #55c97f;
+  --color-cls-excellent: #77d0a0;
+  --color-cls-good: #a9c77f;
+  --color-cls-book: #a7b1c2;
+  --color-cls-inaccuracy: #f1c232;
+  --color-cls-mistake: #ff7d26;
+  --color-cls-blunder: #f0544c;
+  --color-cls-miss: #d77ef0;
+  --color-cls-ink: #121316;
+  --color-cls-outline: rgb(0 0 0 / 0.3);
+  --color-cls-brilliant-text: var(--color-cls-brilliant);
+  --color-cls-great-text: var(--color-cls-great);
+  --color-cls-best-text: var(--color-cls-best);
+  --color-cls-excellent-text: var(--color-cls-excellent);
+  --color-cls-good-text: var(--color-cls-good);
+  --color-cls-book-text: var(--color-cls-book);
+  --color-cls-inaccuracy-text: var(--color-cls-inaccuracy);
+  --color-cls-mistake-text: var(--color-cls-mistake);
+  --color-cls-blunder-text: var(--color-cls-blunder);
+  --color-cls-miss-text: var(--color-cls-miss);
+
+  /* Shape: small radii, hairlines, almost no shadows */
+  --radius-md: 0.3rem;
+  --radius-lg: 0.4rem;
+  --radius-xl: 0.55rem;
+  --shadow-panel: none;
+}
+
+:root {
+  /* Board texture (a gradient over the square colour: only the light wood has one). */
+  --board-light-image: none;
+  --board-dark-image: none;
+  --board-radius: 4px;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Light mode
+ * ---------------------------------------------------------------------------------------- */
+[data-mode='light'] {
+  color-scheme: light;
+
+  --color-bg: #f5f6f8;
+  --color-panel: #ffffff;
+  --color-panel-2: #f1f2f5;
+  --color-hover: #e7e9ed;
+  --color-selected: #e2e5ee;
+  --color-line: #e1e3e8;
+  --color-fg: #1a1c20;
+  --color-muted: #5b6069;
+  --color-faint: #959aa3;
+  --color-overlay: rgb(0 0 0 / 0.04);
+
+  --color-accent: #4453c4;
+  --color-accent-strong: #3442ad;
+  --color-on-accent: #ffffff;
+
+  --color-danger: #c42b22;
+  --color-bad: #c42b22;
+  --color-bad-strong: #d63a30;
+  --color-good: #17803f;
+  --color-good-strong: #1f9a50;
+  --color-warn: #8f6200;
+  --color-attention: #d08a0c;
+  --color-heat: #d0631b;
+
+  --color-eval-white: #ffffff;
+  --color-eval-black: #2a2c31;
+  --color-eval-track: #3a3d43;
+  --color-eval-fill: #e4e6ea;
+  --color-eval-mid: #959aa3;
+  --color-eval-ink: #2a2c31;
+  --color-chart-dot: #5b6069;
+
+  /* Verdict text: deeper tones, readable on white (badges keep the shared fills). */
+  --color-cls-brilliant-text: #0d7a6e;
+  --color-cls-great-text: #0a6aa6;
+  --color-cls-best-text: #187c3d;
+  --color-cls-excellent-text: #21795a;
+  --color-cls-good-text: #557040;
+  --color-cls-book-text: #5c6880;
+  --color-cls-inaccuracy-text: #8a6100;
+  --color-cls-mistake-text: #c8500a;
+  --color-cls-blunder-text: #a8142a;
+  --color-cls-miss-text: #9b2bb0;
+  --color-cls-outline: rgb(0 0 0 / 0.2);
+
+  --shadow-panel: 0 1px 2px rgb(16 18 24 / 0.05);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Boards: squares, coordinates, highlights and arrows tuned for each one. Brown is also the
+ * default (:root). Any element can carry data-board (the swatches in Ajustes do).
+ * ---------------------------------------------------------------------------------------- */
+:root,
+[data-board='brown'] {
+  --color-board-light: #f0d9b5;
+  --color-board-dark: #b58863;
+  --color-board-coord-light: #835b37;
+  --color-board-coord-dark: #4a2e16;
+  --color-board-last-move: rgb(240 200 30 / 0.58);
+  --color-board-neutral: rgb(240 196 30 / 0.5);
+  --color-board-hint: rgb(37 99 235 / 0.9);
+  --color-board-check: rgb(240 0 0);
+  --color-board-danger: #d42020;
+  --color-board-target: #1f5fe0;
+  --color-board-good: #15903c;
+  --color-arrow-best: #15903c;
+  --color-arrow-threat: #d42020;
+  --color-arrow-attack: #1f5fe0;
+}
+
+[data-board='blue'] {
+  --color-board-light: #dee3e6;
+  --color-board-dark: #8ca2ad;
+  --color-board-coord-light: #5b7280;
+  --color-board-coord-dark: #26363f;
+  --color-board-last-move: rgb(155 199 0 / 0.45);
+  --color-board-neutral: rgb(255 240 120 / 0.55);
+  --color-board-hint: rgb(124 58 237 / 0.9);
+  --color-board-check: rgb(225 30 30 / 0.9);
+  --color-board-danger: #d42020;
+  --color-board-target: #e89200;
+  --color-board-good: #12873a;
+  --color-arrow-best: #12873a;
+  --color-arrow-threat: #d42020;
+  --color-arrow-attack: #e88a00;
+}
+
+[data-board='gray'] {
+  --color-board-light: #e6e6e6;
+  --color-board-dark: #a3a3a3;
+  --color-board-coord-light: #6b6b6b;
+  --color-board-coord-dark: #333333;
+  --color-board-last-move: rgb(250 204 21 / 0.5);
+  --color-board-neutral: rgb(60 130 255 / 0.5);
+  --color-board-hint: rgb(37 99 235 / 0.9);
+  --color-board-check: rgb(225 30 30 / 0.9);
+  --color-board-danger: #d42020;
+  --color-board-target: #ff9000;
+  --color-board-good: #12873a;
+  --color-arrow-best: #12873a;
+  --color-arrow-threat: #d42020;
+  --color-arrow-attack: #ff9000;
+}
+
+[data-board='wood'] {
+  --color-board-light: #f4e4c4;
+  --color-board-dark: #d0a574;
+  --color-board-coord-light: #8c6338;
+  --color-board-coord-dark: #573714;
+  --color-board-last-move: rgb(240 190 20 / 0.6);
+  --color-board-neutral: rgb(240 190 20 / 0.56);
+  --color-board-hint: rgb(37 99 235 / 0.9);
+  --color-board-check: rgb(240 0 0);
+  --color-board-danger: #d42020;
+  --color-board-target: #1f5fe0;
+  --color-board-good: #12873a;
+  --color-arrow-best: #12873a;
+  --color-arrow-threat: #d42020;
+  --color-arrow-attack: #1f5fe0;
+  --board-light-image: repeating-linear-gradient(
+    96deg,
+    rgb(255 255 255 / 0.06) 0 3px,
+    rgb(140 90 30 / 0.03) 3px 7px
+  );
+  --board-dark-image: repeating-linear-gradient(
+    94deg,
+    rgb(255 255 255 / 0.04) 0 2px,
+    rgb(110 65 20 / 0.06) 2px 6px
+  );
+}
+
+[data-board='slate'] {
+  --color-board-light: #b4bec7;
+  --color-board-dark: #6b7a87;
+  --color-board-coord-light: #3f4c57;
+  --color-board-coord-dark: #e9eef2;
+  --color-board-last-move: rgb(250 204 21 / 0.45);
+  --color-board-neutral: rgb(255 240 150 / 0.5);
+  --color-board-hint: rgb(124 58 237 / 0.95);
+  --color-board-check: rgb(235 30 30 / 0.9);
+  --color-board-danger: #e01f1f;
+  --color-board-target: #f2a000;
+  --color-board-good: #1aa34a;
+  --color-arrow-best: #1aa34a;
+  --color-arrow-threat: #e01f1f;
+  --color-arrow-attack: #f2a000;
+}

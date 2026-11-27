@@ -9,9 +9,10 @@ import {
 import type { Classification } from '../../api/analysis'
 import type { Color } from '../../api/games'
 import { ClassBadge } from '../../components/ClassBadge'
-import { BOARD_COLORS, SQUARE_CONTENT } from '../../components/board/theme'
+import { BOARD_COLORS, CHECK_STYLE, SQUARE_CONTENT } from '../../components/board/theme'
 import { PromotionDialog } from '../../components/board/PromotionDialog'
-import { resolveDrop, type PromotionPiece } from '../../components/board/moves'
+import { checkedKingSquare, resolveDrop, type PromotionPiece } from '../../components/board/moves'
+import { resolveColor, usePrefs } from '../../theme/prefs'
 import { CLASSIFICATIONS } from './classification'
 
 export interface BoardArrow {
@@ -50,31 +51,31 @@ interface Props {
   interactive?: boolean
   /** Duration of the slide when `animate` (ms). */
   animationMs?: number
+  /** Board id (squares are `#<id>-square-e4`); "review-board" by default. */
+  id?: string
 }
 
-/** Best-move arrow: intense green, thicker and more opaque than the default, visible over pieces. */
+/** Arrows: thicker and more opaque than the default, visible over pieces (contrast.test.ts). */
 const ARROW_OPTIONS = { ...defaultArrowOptions, opacity: 0.8, arrowWidthDenominator: 4 }
 
 /** For moves without a classification (exploring, not analysed yet). */
-const NEUTRAL_FROM = 'rgba(255, 255, 255, 0.22)'
-const NEUTRAL_TO = 'rgba(255, 255, 255, 0.36)'
-/** Hex alpha suffixes: origin ~30 %, target ~55 %. */
-const FROM_ALPHA = '4d'
-const TO_ALPHA = '8c'
+const NEUTRAL_FROM = 'color-mix(in srgb, var(--color-board-neutral) 61%, transparent)'
+const NEUTRAL_TO = 'var(--color-board-neutral)'
+/** The classification colour over the square: origin 30 %, target 55 %. */
+const tint = (color: string, percent: number) =>
+  `color-mix(in srgb, ${color} ${String(percent)}%, transparent)`
 /** Explanation marks: a ring plus a tint over whatever colour the square already has. */
+function mark(color: string, percent: number): CSSProperties {
+  const fill = tint(color, percent)
+  return {
+    boxShadow: `inset 0 0 0 4px ${tint(color, 95)}`,
+    backgroundImage: `linear-gradient(${fill}, ${fill})`,
+  }
+}
 const MARK_STYLES: Record<MarkedSquare['role'], CSSProperties> = {
-  danger: {
-    boxShadow: 'inset 0 0 0 4px rgba(220, 38, 38, 0.95)',
-    backgroundImage: 'linear-gradient(rgba(220, 38, 38, 0.35), rgba(220, 38, 38, 0.35))',
-  },
-  target: {
-    boxShadow: 'inset 0 0 0 4px rgba(245, 158, 11, 0.95)',
-    backgroundImage: 'linear-gradient(rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.3))',
-  },
-  good: {
-    boxShadow: 'inset 0 0 0 4px rgba(22, 163, 74, 0.95)',
-    backgroundImage: 'linear-gradient(rgba(22, 163, 74, 0.35), rgba(22, 163, 74, 0.35))',
-  },
+  danger: mark('var(--color-board-danger)', 35),
+  target: mark('var(--color-board-target)', 30),
+  good: mark('var(--color-board-good)', 35),
 }
 
 export function ReviewBoard({
@@ -87,7 +88,10 @@ export function ReviewBoard({
   onMove,
   interactive = true,
   animationMs = 200,
+  id = 'review-board',
 }: Props) {
+  // Re-render when the board or piece set changes: arrows need literal colours.
+  usePrefs()
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null)
   const turn: Color = new Chess(fen).turn() === 'w' ? 'white' : 'black'
 
@@ -97,14 +101,16 @@ export function ReviewBoard({
       const color = shownMove.classification
         ? CLASSIFICATIONS[shownMove.classification].color
         : null
-      styles[shownMove.from] = { backgroundColor: color ? color + FROM_ALPHA : NEUTRAL_FROM }
-      styles[shownMove.to] = { backgroundColor: color ? color + TO_ALPHA : NEUTRAL_TO }
+      styles[shownMove.from] = { backgroundColor: color ? tint(color, 30) : NEUTRAL_FROM }
+      styles[shownMove.to] = { backgroundColor: color ? tint(color, 55) : NEUTRAL_TO }
     }
+    const checked = checkedKingSquare(fen)
+    if (checked) styles[checked] = { ...styles[checked], ...CHECK_STYLE }
     for (const mark of marks) {
       styles[mark.square] = { ...styles[mark.square], ...MARK_STYLES[mark.role] }
     }
     return styles
-  }, [shownMove, marks])
+  }, [fen, shownMove, marks])
 
   const badgeSquare = shownMove?.classification ? shownMove.to : null
   const squareRenderer = ({ square, children }: SquareHandlerArgs & { children?: ReactNode }) => (
@@ -150,13 +156,18 @@ export function ReviewBoard({
   }
 
   return (
-    <div data-testid="review-board" className="relative w-full overflow-visible">
+    <div data-testid={id} className="relative w-full overflow-visible">
       <Chessboard
         options={{
-          id: 'review-board',
+          id,
           position: fen,
           boardOrientation: orientation,
-          arrows: arrows.map((a) => ({ startSquare: a.from, endSquare: a.to, color: a.color })),
+          // SVG attributes: a token has to be a literal colour here.
+          arrows: arrows.map((a) => ({
+            startSquare: a.from,
+            endSquare: a.to,
+            color: resolveColor(a.color),
+          })),
           allowDrawingArrows: false,
           arrowOptions: ARROW_OPTIONS,
           showAnimations: animate,

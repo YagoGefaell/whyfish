@@ -1,15 +1,26 @@
-import bB from '../../assets/pieces/cburnett/bB.svg'
-import bK from '../../assets/pieces/cburnett/bK.svg'
-import bN from '../../assets/pieces/cburnett/bN.svg'
-import bP from '../../assets/pieces/cburnett/bP.svg'
-import bQ from '../../assets/pieces/cburnett/bQ.svg'
-import bR from '../../assets/pieces/cburnett/bR.svg'
-import wB from '../../assets/pieces/cburnett/wB.svg'
-import wK from '../../assets/pieces/cburnett/wK.svg'
-import wN from '../../assets/pieces/cburnett/wN.svg'
-import wP from '../../assets/pieces/cburnett/wP.svg'
-import wQ from '../../assets/pieces/cburnett/wQ.svg'
-import wR from '../../assets/pieces/cburnett/wR.svg'
+import type { PieceSet } from '../../api/ui'
 
-/** cburnett piece set (BSD, see assets/pieces/cburnett/LICENSE.md). Keys: "wK", "bP"... */
-export const PIECE_URLS: Record<string, string> = { wK, wQ, wR, wB, wN, wP, bK, bQ, bR, bB, bN, bP }
+/**
+ * Piece sets (each with its licence in assets/pieces/<set>/LICENSE.md). Keys: "wK", "bP"...
+ * The set is chosen in Ajustes (phase 6.5).
+ */
+const FILES = import.meta.glob<string>('../../assets/pieces/*/*.svg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
+
+const SETS: Partial<Record<PieceSet, Record<string, string>>> = {}
+for (const [path, url] of Object.entries(FILES)) {
+  const match = /pieces\/([^/]+)\/(\w+)\.svg$/.exec(path)
+  if (!match) continue
+  const [, set, code] = match as unknown as [string, PieceSet, string]
+  ;(SETS[set] ??= {})[code] = url
+}
+
+export const PIECE_CODES = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP']
+
+/** URL of a piece of a set (cburnett if the set lacks it). */
+export function pieceUrl(code: string, set: PieceSet): string {
+  return SETS[set]?.[code] ?? SETS.cburnett?.[code] ?? ''
+}

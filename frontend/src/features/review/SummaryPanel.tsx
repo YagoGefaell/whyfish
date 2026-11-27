@@ -16,7 +16,7 @@ export function ColorDot({ color }: { color: Color }) {
     <span
       aria-hidden="true"
       className={`inline-block h-3 w-3 rounded-full ring-1 ${
-        color === 'white' ? 'bg-[#f2f1ee] ring-black/30' : 'bg-[#1f1e1b] ring-white/40'
+        color === 'white' ? 'bg-eval-white ring-black/30' : 'bg-eval-black ring-white/40'
       }`}
     />
   )
@@ -73,7 +73,7 @@ export function SummaryPanel({ review, names, onStart, onSelect }: Props) {
                 return (
                   <td
                     key={color}
-                    className={`w-14 text-center ${userCol(color)} ${n === 0 ? 'text-[#77736d]' : 'font-semibold'}`}
+                    className={`w-14 text-center ${userCol(color)} ${n === 0 ? 'text-faint' : 'font-semibold'}`}
                   >
                     {n}
                   </td>

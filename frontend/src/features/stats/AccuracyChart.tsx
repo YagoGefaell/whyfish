@@ -30,14 +30,19 @@ export function AccuracyChart({ points }: { points: AccuracyPoint[] }) {
           </text>
         </g>
       ))}
-      <path d={line.join(' ')} fill="none" stroke="#81b64c" strokeWidth={2.5} />
+      <path
+        d={line.join(' ')}
+        fill="none"
+        style={{ stroke: 'var(--color-chart-line)' }}
+        strokeWidth={2.5}
+      />
       {points.map((p, i) => (
         <circle
           key={p.game_id}
           cx={x(i)}
           cy={y(p.accuracy)}
           r={4}
-          fill="#e5e5e5"
+          style={{ fill: 'var(--color-chart-dot)' }}
           opacity={0.7}
           className="cursor-pointer"
           onClick={() => {

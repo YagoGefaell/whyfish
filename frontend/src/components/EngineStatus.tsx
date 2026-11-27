@@ -32,7 +32,7 @@ export function EngineStatus() {
   return (
     <span
       role="status"
-      className="inline-flex items-center gap-1.5 text-sm text-[#f7c631]"
+      className="inline-flex items-center gap-1.5 text-sm text-warn"
       title={problem}
     >
       <TriangleAlert size={15} aria-hidden="true" />

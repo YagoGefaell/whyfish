@@ -4,7 +4,9 @@ _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
 Fase 6 (aprendizaje a largo plazo: 6a importación, 6b estadísticas, 6c entrenamiento) —
-**cerrada** (2026-11-27). Siguiente: Fase 7 (Raspberry Pi), sin empezar.
+**cerrada** (2026-11-27). **Fase 6.5 (identidad propia y feedback) en curso:** interfaz base
+única (claro/oscuro) y tablero y piezas elegibles en Ajustes hechos; **esperando el OK del
+usuario a las capturas** antes de sonido y feedback visual. Fase 7 (Raspberry Pi), sin empezar.
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -313,7 +315,58 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   bot, las más recientes).
 - **Tests:** backend 374, frontend 69, e2e 21 (6 omitidos por viewport).
 
+### Fase 6.5 — Identidad propia y feedback (en curso)
+- Copia de seguridad: `data/backups/whyfish-2026-11-27-pre-6.5.db` (API de backup de SQLite,
+  solo lectura sobre la base).
+- **Cambio de planteamiento (decisión del usuario):** las tres direcciones (Cuaderno, Pizarra,
+  Whyfish) se descartan y se borran (tokens por tema, insignias sello/hexágono/bocadillo, logo
+  de pez, `themes.ts`, Source Serif 4 y Nunito). En su lugar, una interfaz limpia única y
+  tablero/piezas personalizables.
+- **Tokens:** `frontend/src/theme/tokens.css`, dos ejes en `<html>`: `data-mode` (oscuro por
+  defecto, bloque claro) y `data-board` (marrón por defecto; azul, gris, madera clara,
+  pizarra). Grises neutros, Inter, radios pequeños, sombras mínimas. Acento índigo sobrio
+  (`#8c9cf2` oscuro / `#4453c4` claro). Ningún color fuera de los tokens.
+- **Clasificaciones:** relleno de insignia igual en los dos modos (símbolo oscuro), texto del
+  veredicto con su token por modo (`--color-cls-*-text`). Imprecisión/error/grave error en
+  amarillo/naranja/rojo, distancia OKLab comprobada. Insignia: cuadrado redondeado; iconos
+  propios de Mejor (gema) y Teoría (marcapáginas).
+- **Ajustes > Apariencia:** modo (sistema/claro/oscuro), tablero y piezas, con vista previa
+  en vivo (3.Bxf7+?? con insignia, jaque y dos flechas). Se aplica al elegir y se guarda en la
+  base: `GET/PUT /api/settings/ui` (`AppSetting` `ui_color_mode`, `ui_board`, `ui_pieces`;
+  valores por defecto en `config.UI`; un valor guardado ya no válido vuelve al de por defecto).
+  `src/theme/prefs.ts` aplica los atributos, cachea en localStorage (sin parpadeo al cargar) y
+  re-renderiza los tableros (`usePrefs`).
+- **Tableros:** cada uno con casillas, coordenadas, última jugada, resaltado neutro, pista,
+  jaque, marcas (peligro/objetivo/buena) y flechas propias (en marrón y madera, ataque/objetivo
+  en azul porque el ámbar no se distinguía de la casilla). El tablero de revisión ahora también
+  marca el jaque.
+- **Piezas:** cburnett (BSD, por defecto), mpchess (GPLv3+), chessnut (Apache 2.0), rhosgfx
+  (CC0); aviso de licencia en cada carpeta.
+- **Arreglo:** la «caja vacía» bajo las acciones del panel de revisión era «Detalles del
+  motor» cortado por el scroll: ahora es una fila con filete y la zona de scroll tiene sombras
+  de desplazamiento (`.scroll-fade`).
+- **Favicon** propio (peón blanco sobre el índigo).
+- **Tests:** `src/theme/contrast.test.ts` (texto e insignias ≥ 4.5:1 en ambos modos; por
+  tablero: coordenadas ≥ 3:1 y ΔE OKLab mínimo de resaltados, jaque, marcas, flechas y casilla
+  de la jugada clasificada); backend `tests/api/test_ui_settings.py`. Frontend 188, backend 403,
+  e2e 21.
+- **Capturas:** `make appearance-shots` → `frontend/e2e-artifacts/appearance/` (claro/oscuro ×
+  escritorio/móvil × revisión con error, resumen, Ajustes; `boards.png`, `pieces.png`).
+- **Dependencias:** ninguna nueva neta (se quitaron las dos fuentes añadidas antes).
+- **Ajustes tras el OK del usuario (punto de control):**
+  - Lista de jugadas de la revisión: autodesplazamiento corregido (medía `offsetTop` contra el
+    panel absoluto; ahora compara rectángulos y se recalcula al redimensionar). Al menos 8 filas
+    en 1366×768 (10 en la práctica): «Detalles del motor» es un botón pequeño («Motor») en la
+    fila de acciones, gráfica más baja, panel y botones más compactos. El e2e de capturas
+    comprueba que la jugada actual se ve y las 8 filas.
+  - Plantillas: ya no añaden «Mejor era X.» / «Había que jugar X.» al final (la interfaz lo
+    muestra en «La mejor era X» y en un ejercicio delataría la solución). Regla en SPEC §5.1.
+  - Ajustes sin botones «Guardar»: cuentas al salir del campo o tras 1,2 s, solo si cambiaron;
+    entrenamiento al cambiar. Aviso discreto «Guardado» (`useAutoSave`, `SaveNote`).
+- Pendiente: sonido (Web Audio, ajustes en `/api/settings/ui`), feedback visual, tests y docs.
+
 ## Pendiente / siguiente paso
+- Fase 6.5: OK del usuario a la interfaz base y los tableros; después sonido y feedback visual.
 - Fase 7 (despliegue en Raspberry Pi): plan y OK del usuario antes de empezar.
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
   `make explain-report`); no se ha regenerado tras los ajustes de cierre de la Fase 5 (cambian

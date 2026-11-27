@@ -8,13 +8,9 @@ import {
 import type { Color } from '../../api/games'
 import { checkedKingSquare, resolveDrop, type PromotionPiece } from './moves'
 import { PromotionDialog } from './PromotionDialog'
-import { BOARD_COLORS, SQUARE_CONTENT } from './theme'
+import { BOARD_COLORS, CHECK_STYLE, LAST_MOVE_STYLE, SQUARE_CONTENT } from './theme'
 
-const LAST_MOVE_STYLE: CSSProperties = { backgroundColor: 'rgba(255, 213, 79, 0.55)' }
-const HINT_STYLE: CSSProperties = { boxShadow: 'inset 0 0 0 4px rgba(37, 99, 235, 0.9)' }
-const CHECK_STYLE: CSSProperties = {
-  background: 'radial-gradient(circle, rgba(220, 38, 38, 0.85) 0%, rgba(220, 38, 38, 0) 75%)',
-}
+const HINT_STYLE: CSSProperties = { boxShadow: 'inset 0 0 0 4px var(--color-board-hint)' }
 
 interface Props {
   fen: string
@@ -82,7 +78,7 @@ export function Board({
   }
 
   return (
-    <div className="relative w-full">
+    <div data-testid="play-board" className="relative w-full">
       <Chessboard
         options={{
           id: 'play-board',

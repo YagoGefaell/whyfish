@@ -20,7 +20,7 @@ export function EvalGraph({ evals, moves, position, onSelect, className = '' }: 
   return (
     <div
       data-testid="eval-graph"
-      className={`relative w-full select-none overflow-hidden rounded-lg bg-[#403d39] ${className}`}
+      className={`relative w-full select-none overflow-hidden rounded-lg bg-eval-track ${className}`}
     >
       <svg
         viewBox={`0 0 ${String(last)} 100`}
@@ -28,13 +28,16 @@ export function EvalGraph({ evals, moves, position, onSelect, className = '' }: 
         className="absolute inset-0 h-full w-full"
         aria-hidden="true"
       >
-        <polygon points={`0,100 ${points} ${String(last)},100`} fill="#d9d7d2" />
+        <polygon
+          points={`0,100 ${points} ${String(last)},100`}
+          style={{ fill: 'var(--color-eval-fill)' }}
+        />
         <line
           x1={0}
           x2={last}
           y1={50}
           y2={50}
-          stroke="#8a867f"
+          style={{ stroke: 'var(--color-eval-mid)' }}
           strokeWidth={1}
           vectorEffect="non-scaling-stroke"
           strokeDasharray="3 3"
@@ -44,7 +47,7 @@ export function EvalGraph({ evals, moves, position, onSelect, className = '' }: 
           x2={position}
           y1={0}
           y2={100}
-          stroke="#81b64c"
+          style={{ stroke: 'var(--color-chart-line)' }}
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"
         />
@@ -56,7 +59,7 @@ export function EvalGraph({ evals, moves, position, onSelect, className = '' }: 
           <span
             key={m.ply}
             data-testid="graph-dot"
-            className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[#2b2a27]"
+            className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-panel"
             style={{
               left: `${String((pos / last) * 100)}%`,
               top: `${String(100 - (evals[pos]?.win ?? 50))}%`,

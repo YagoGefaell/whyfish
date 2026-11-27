@@ -123,7 +123,7 @@ export function Exercise({ sessionId, position, itemId, onAnswered, onNext }: Pr
     arrows = (step?.arrows ?? []).map((a) => ({
       from: a.from_square,
       to: a.to_square,
-      color: '#dc2626',
+      color: 'var(--color-arrow-threat)',
     }))
   } else if (stage.kind === 'checking' || stage.kind === 'done') {
     fen = fenAfter(exercise.fen, [stage.uci])
@@ -191,7 +191,7 @@ export function Exercise({ sessionId, position, itemId, onAnswered, onNext }: Pr
             {stage.kind === 'error' && <p className="text-danger">{stage.message}</p>}
             {done && right && (
               <div role="status" aria-label="Resultado" className="flex flex-col gap-2">
-                <p className="flex items-center gap-2 font-medium text-[#4ade80]">
+                <p className="flex items-center gap-2 font-medium text-good">
                   <Check size={18} /> ¡Bien visto!
                   {done.result.also.length > 0 && (
                     <span className="text-fg">También valía {done.result.also.join(' o ')}.</span>

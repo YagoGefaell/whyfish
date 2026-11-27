@@ -143,7 +143,9 @@ def level1(
         return None
     pl, bl, second = facts.played_line, facts.best_line, facts.second_line
     best = mt.move(bl, 0) if bl and bl.sans else None
-    better = f" Mejor era {best}." if best and not facts.is_best else ""
+    # The best move is not repeated at the end of the text: the review shows it in its own box
+    # ("La mejor era X") and an exercise must not give the solution away. It appears only when
+    # the sentence is about it (missed gain, "X era mejor: <reason>").
     error_prefix = ""
     if facts.after_opponent_error:
         error_prefix = (
@@ -163,7 +165,7 @@ def level1(
                 text = f"Esta jugada permite {clause}: {reply}."
             else:
                 text = f"Esta jugada permite {clause} que empieza con {reply}."
-            return text + (f" Había que jugar {best}." if best else "")
+            return text
 
         case K.MISSED_MATE:
             assert bl is not None and bl.mate is not None
@@ -195,7 +197,7 @@ def level1(
                 )
             joiner = ": " if idea.index == 1 else " y "
             worse = _eval_clause(facts, idea.gain)
-            return f"{head}{joiner}{took}{worse}.{better}"
+            return f"{head}{joiner}{took}{worse}."
 
         case K.TACTIC_ALLOWED:
             assert pl is not None and idea.motif is not None and idea.index is not None
@@ -203,7 +205,7 @@ def level1(
             lead = "Esta jugada permite" if idea.index == 1 else "Tras esta jugada llega"
             fork = _fork_loss(idea.motif, idea.gain)
             lost = f"se pierde {fork}" if fork else _lose(idea.gain, idea.piece)
-            return f"{lead} {reply}, que {_motif_clause(idea.motif)}: {lost}.{better}"
+            return f"{lead} {reply}, que {_motif_clause(idea.motif)}: {lost}."
 
         case K.LOSES_MATERIAL:
             assert pl is not None
@@ -211,7 +213,7 @@ def level1(
             c = pl.consequence
             loss = es.exchange(c.lost, c.won) if c.settled and c.lost else _loss(idea.gain, None)
             worse = _eval_clause(facts, idea.gain)
-            return f"Esta jugada pierde {loss}: la refutación empieza con {reply}{worse}.{better}"
+            return f"Esta jugada pierde {loss}: la refutación empieza con {reply}{worse}."
 
         case K.MISSED_GAIN:
             assert best is not None and bl is not None
@@ -239,7 +241,7 @@ def level1(
             reason = _best_clause(facts.best, idea.used)
             if negatives:
                 head = f"Esta jugada {negatives[0]}."
-                tail = f" {best} era mejor: {reason}." if reason else better
+                tail = f" {best} era mejor: {reason}." if reason else ""
                 return head + tail
             if reason:
                 return f"{best} era mejor: {reason}."

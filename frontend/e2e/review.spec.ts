@@ -82,7 +82,7 @@ test('import, analyse and review a game', async ({ page }, testInfo) => {
   await expect(panel.getByRole('heading').first()).toContainText('Nxb5')
 
   // Explore a line from the engine details.
-  await panel.getByText('Detalles del motor').click()
+  await panel.getByRole('button', { name: /Detalles del motor/ }).click()
   await panel.getByLabel('Continuación tras la jugada').getByRole('button').first().click()
   const variant = page.getByRole('status', { name: 'Variante explorada' })
   await expect(variant).toContainText(/Evaluación [+-]?\d|Jaque mate|Tablas/, { timeout: 15_000 })

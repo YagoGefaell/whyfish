@@ -288,3 +288,18 @@ class TrainingThresholds:
 
 
 TRAINING = TrainingThresholds()
+
+
+# --- Interface (phase 6.5) -------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UiDefaults:
+    """Defaults of the interface settings (changeable in Ajustes, stored in the database)."""
+
+    color_mode: str = "system"  # system | light | dark
+    board: str = "brown"  # brown | blue | gray | wood | slate
+    pieces: str = "cburnett"  # cburnett | mpchess | chessnut | rhosgfx
+
+
+UI = UiDefaults()

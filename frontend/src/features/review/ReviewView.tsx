@@ -26,12 +26,15 @@ import { TryIt, type TryState } from './why/TryIt'
 import { useWhyPlayer } from './why/useWhyPlayer'
 import { WhyBar, WhyPanel } from './why/WhyViews'
 
-// Intense green; react-chessboard applies the 0.8 opacity (ReviewBoard ARROW_OPTIONS).
-const BEST_ARROW = '#16a34a'
-/** Explanation arrows: the opponent's threat (red), what a good move attacks (amber). */
-const ANNOTATION_ARROW = { threat: '#dc2626', attack: '#f59e0b' } as const
+// Arrow colours are tokens (theme/tokens.css); react-chessboard applies the 0.8 opacity.
+const BEST_ARROW = 'var(--color-arrow-best)'
+/** Explanation arrows: the opponent's threat, what a good move attacks. */
+const ANNOTATION_ARROW = {
+  threat: 'var(--color-arrow-threat)',
+  attack: 'var(--color-arrow-attack)',
+} as const
 /** Threats drawn while replaying a sequence ("Ver por qué"). */
-const WHY_ARROW = '#dc2626'
+const WHY_ARROW = 'var(--color-arrow-threat)'
 
 interface Exploration {
   base: number // main-line position the variation starts from
@@ -435,7 +438,7 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
           aria-label="Panel de revisión"
           className="panel flex flex-col lg:absolute lg:inset-0"
         >
-          <div className="order-first border-b border-line p-3 lg:order-last lg:border-t lg:border-b-0">
+          <div className="order-first border-b border-line p-2.5 lg:order-last lg:border-t lg:border-b-0">
             {why ? (
               <WhyBar
                 why={why.data}
@@ -457,10 +460,10 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
                 moves={review.moves}
                 position={exploration ? exploration.base : shownPosition}
                 onSelect={jump}
-                className="h-20 lg:h-24"
+                className="h-20"
               />
             ) : (
-              <div className="h-20 rounded-lg bg-panel-2 lg:h-24" aria-hidden="true" />
+              <div className="h-20 rounded-lg bg-panel-2" aria-hidden="true" />
             )}
           </div>
           {review ? (
@@ -479,7 +482,7 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
                   onClick={() => {
                     setTab(id)
                   }}
-                  className={`flex-1 border-b-2 px-3 py-2.5 text-sm font-semibold ${
+                  className={`flex-1 border-b-2 px-3 py-2 text-sm font-semibold ${
                     tab === id
                       ? 'border-accent text-fg'
                       : 'border-transparent text-muted hover:text-fg'
@@ -491,7 +494,7 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
             </div>
           ) : null}
           <div
-            className={`flex min-h-0 flex-1 flex-col gap-4 p-4 ${
+            className={`flex min-h-0 flex-1 flex-col gap-3 p-3 ${
               review && tab === 'summary' ? 'overflow-y-auto' : 'lg:overflow-hidden'
             }`}
           >
@@ -507,7 +510,7 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
               />
             )}
             {review && tab === 'review' && (
-              <div className="shrink-0 lg:max-h-[68%] lg:overflow-y-auto">
+              <div className="scroll-fade lg:min-h-0 lg:shrink lg:overflow-y-auto">
                 {why ? (
                   <WhyPanel
                     why={why.data}
@@ -594,7 +597,8 @@ export function ReviewView({ game, review, status, meta, initialPly = null }: Pr
             )}
             {(!review || tab === 'review') && (
               <div
-                className={`flex min-h-0 flex-1 flex-col border-t border-line pt-3 ${
+                // At least 8 rows of moves at 1366×768: the coach card scrolls before this shrinks.
+                className={`flex min-h-0 flex-1 flex-col border-t border-line pt-2 lg:min-h-[248px] ${
                   why || trying ? 'opacity-50' : ''
                 }`}
               >
@@ -662,7 +666,7 @@ function ExplorationCard(props: {
     <div
       role="status"
       aria-label="Variante explorada"
-      className="flex flex-col gap-2 rounded-lg border border-[#f7c631]/40 bg-[#f7c631]/10 p-3 text-sm"
+      className="flex flex-col gap-2 rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm"
     >
       <div className="flex items-center gap-2">
         <span className="font-semibold">Variante desde {props.base}</span>
@@ -678,7 +682,7 @@ function ExplorationCard(props: {
             onClick={() => {
               props.onPick(i)
             }}
-            className={`rounded-md px-1.5 py-0.5 font-medium ${i + 1 === props.index ? 'bg-[#f7c631]/30' : 'hover:bg-white/10'}`}
+            className={`rounded-md px-1.5 py-0.5 font-medium ${i + 1 === props.index ? 'bg-warn/30' : 'hover:bg-overlay'}`}
           >
             {san}
           </button>

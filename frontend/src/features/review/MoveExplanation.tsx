@@ -35,7 +35,7 @@ export function MarkedParagraph({
             onRef(ref)
           }}
           title="Ver en el tablero"
-          className="tabular rounded-md bg-panel-2 px-1.5 py-px font-semibold text-fg hover:bg-[#45423e]"
+          className="tabular rounded-md bg-panel-2 px-1.5 py-px font-semibold text-fg hover:bg-hover"
         >
           {san}
         </button>

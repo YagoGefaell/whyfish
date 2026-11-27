@@ -1,27 +1,7 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
 
-/*
- * Theme: sober dark UI. Contrast (WCAG): fg on panels >= 10:1, muted on panels >= 5.4:1,
- * accent text on panels >= 5.1:1, dark text on accent buttons 6.9:1.
- */
-@theme {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-
-  --color-bg: #1f1e1b;
-  --color-panel: #2b2a27;
-  --color-panel-2: #363431;
-  --color-line: #3a3935;
-  --color-fg: #ebe9e6;
-  --color-muted: #aeaba6;
-  --color-accent: #81b64c;
-  --color-accent-strong: #95c862;
-  --color-danger: #e05a4f;
-
-  /* Board */
-  --color-square-dark: #739552;
-  --color-square-light: #ebecd0;
-}
+@import './theme/tokens.css';
 
 @layer base {
   html {
@@ -43,19 +23,29 @@
 
 @layer components {
   .panel {
-    @apply rounded-xl border border-line bg-panel;
+    @apply rounded-xl border border-line bg-panel shadow-panel;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-fg transition-colors hover:bg-[#403e3a] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-icon {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-panel-2 text-fg transition-colors hover:bg-[#403e3a] disabled:cursor-not-allowed disabled:opacity-30;
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-panel-2 text-fg transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30;
   }
   .field {
     @apply rounded-lg border border-line bg-panel-2 px-3 py-2 text-fg placeholder:text-muted;
+  }
+  /* Scroll shadows: a soft edge where a scrollable box has more content (works in any mode). */
+  .scroll-fade {
+    background:
+      linear-gradient(var(--color-panel) 30%, transparent) top / 100% 24px no-repeat local,
+      linear-gradient(transparent, var(--color-panel) 70%) bottom / 100% 24px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.22), transparent) top / 100% 10px
+        no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.22), transparent) bottom / 100% 10px
+        no-repeat scroll;
   }
   .tabular {
     font-variant-numeric: tabular-nums;

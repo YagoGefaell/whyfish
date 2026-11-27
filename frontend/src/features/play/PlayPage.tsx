@@ -79,7 +79,7 @@ function PlayGameView({ gameId }: { gameId: number }) {
             Tú ({COLOR_LABEL[game.player_color]}) vs Stockfish · {game.bot_level_label}
           </h2>
           <StatusLine game={game} busy={play.busy} />
-          {play.notice && <p className="text-sm text-[#f7c631]">{play.notice}</p>}
+          {play.notice && <p className="text-sm text-warn">{play.notice}</p>}
           {play.actionError && (
             <p role="alert" className="text-sm text-danger">
               {play.actionError}

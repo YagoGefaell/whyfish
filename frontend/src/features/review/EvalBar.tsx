@@ -21,13 +21,13 @@ export function EvalBar({ evaluation, orientation, boardOrientation, className =
   const share = `${String(win)}%`
   const white = (
     <div
-      className="shrink-0 bg-[#f2f1ee] transition-all duration-300"
+      className="shrink-0 bg-eval-white transition-all duration-300"
       style={vertical ? { height: share } : { width: share }}
     />
   )
   const filler = <div className="flex-1" />
   const labelAtEnd = win >= 50 ? whiteAtEnd : !whiteAtEnd
-  const labelColor = win >= 50 ? 'text-[#2b2a27]' : 'text-[#f2f1ee]'
+  const labelColor = win >= 50 ? 'text-eval-ink' : 'text-eval-white'
   const place = vertical
     ? `inset-x-0 text-center ${labelAtEnd ? 'bottom-1' : 'top-1'}`
     : `inset-y-0 flex items-center px-1.5 ${labelAtEnd ? 'right-0' : 'left-0'}`
@@ -40,7 +40,7 @@ export function EvalBar({ evaluation, orientation, boardOrientation, className =
       aria-valuenow={Math.round(win)}
       aria-valuetext={label || 'sin evaluación'}
       data-testid={`eval-bar-${orientation}`}
-      className={`relative flex overflow-hidden rounded-md bg-[#403d39] ${
+      className={`relative flex overflow-hidden rounded-md bg-eval-track ${
         vertical ? 'w-7 flex-col' : 'h-6 w-full flex-row'
       } ${evaluation ? '' : 'opacity-50'} ${className}`}
     >

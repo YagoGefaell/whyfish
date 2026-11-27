@@ -186,15 +186,17 @@ describe('ReviewView', () => {
   it('remembers whether the engine details are open', () => {
     const { unmount } = renderReview()
     startReview()
-    const details = () => within(panel()).getByText('Detalles del motor').closest('details')
-    expect(details()).not.toHaveAttribute('open')
-    fireEvent.click(within(panel()).getByText('Detalles del motor'))
-    details()?.dispatchEvent(new Event('toggle'))
+    const toggle = () => within(panel()).getByRole('button', { name: /Detalles del motor/ })
+    const details = () => within(panel()).queryByRole('region', { name: 'Detalles del motor' })
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(details()).toBeNull()
+    fireEvent.click(toggle())
+    expect(details()).not.toBeNull()
     expect(window.localStorage.getItem('whyfish.review.engineDetails')).toBe('1')
     unmount()
     renderReview()
     startReview()
-    expect(details()).toHaveAttribute('open')
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('explores a line with the engine evaluation and returns to the game', async () => {

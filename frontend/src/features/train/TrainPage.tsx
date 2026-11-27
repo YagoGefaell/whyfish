@@ -59,7 +59,7 @@ function TrainSession({ query }: { query: string }) {
           </span>
         )}
         <span className="inline-flex items-center gap-1 text-sm" aria-label="Racha">
-          <Flame size={16} className="text-[#ff9a3c]" /> Racha: {session.streak}{' '}
+          <Flame size={16} className="text-heat" /> Racha: {session.streak}{' '}
           {session.streak === 1 ? 'día' : 'días'}
         </span>
         {label && (

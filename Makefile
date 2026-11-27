@@ -1,6 +1,6 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze explain-report why-report stats-report training-report \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze explain-report why-report stats-report training-report appearance-shots \
         lint lint-backend lint-frontend fmt
 
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "make test      Fast tests: pytest (fake engine) + Vitest"
 	@echo "make test-integration  Tests against the real Stockfish (reduced search times)"
 	@echo "make test-e2e  Browser tests (Playwright) on their own DB and ports; screenshots in frontend/e2e-artifacts/"
+	@echo "make appearance-shots  Appearance screenshots (light/dark, boards, pieces) in frontend/e2e-artifacts/appearance/"
 	@echo "make analyze PGN=file.pgn  Analyse a PGN with Stockfish and print the review"
 	@echo "DATABASE_URL=sqlite:////tmp/x.db make explain-report  Explanations review report (HTML)"
 	@echo "DATABASE_URL=sqlite:////tmp/x.db make why-report      'Ver por qué' review report (HTML)"
@@ -44,6 +45,9 @@ test-frontend:
 
 test-e2e:
 	cd frontend && pnpm exec playwright test
+
+appearance-shots:
+	cd frontend && APPEARANCE_SHOTS=1 pnpm exec playwright test e2e/appearance.spec.ts
 
 install-e2e:
 	cd frontend && pnpm exec playwright install chromium

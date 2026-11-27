@@ -26,10 +26,9 @@ def test_explanation_of_a_blunder(client: TestClient, fake_engine: FakeEngine) -
     body = client.get(f"/api/games/{gid}/moves/2/explanation").json()
     assert body["ply"] == 2 and body["level"] == 1
     assert body["idea"] == "allows_mate"
-    assert body["text"] == "Esta jugada permite mate inmediato: [[Qh4#]]. Había que jugar [[e3]]."
+    assert body["text"] == "Esta jugada permite mate inmediato: [[Qh4#]]."
     assert body["refs"] == [
         {"san": "Qh4#", "line": "played", "base": 2, "path": ["g2g4", "d8h4"]},
-        {"san": "e3", "line": "best", "base": 2, "path": ["e2e3"]},
     ]
     assert {
         "kind": "arrow",

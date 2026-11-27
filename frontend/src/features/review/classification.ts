@@ -2,7 +2,10 @@ import type { Classification, MoveReview, WhiteEval } from '../../api/analysis'
 
 export interface ClassMeta {
   label: string
+  /** Badge fill and square tint (the same in both modes). */
   color: string
+  /** The verdict text ("es un error"), readable on the panels of the current mode. */
+  textColor: string
   /** Coach sentence: `${san} ${phrase}` ("Nf3 es un error"). */
   phrase: string
   /** Badge in the move list (the board and the coach panel always show it). */
@@ -14,52 +17,80 @@ export interface ClassMeta {
 export const CLASSIFICATIONS: Record<Classification, ClassMeta> = {
   brilliant: {
     label: 'Brillante',
-    color: '#26c2a3',
+    color: 'var(--color-cls-brilliant)',
+    textColor: 'var(--color-cls-brilliant-text)',
     phrase: 'es brillante',
     inList: true,
     isError: false,
   },
   great: {
     label: 'Gran jugada',
-    color: '#5c8bb0',
+    color: 'var(--color-cls-great)',
+    textColor: 'var(--color-cls-great-text)',
     phrase: 'es una gran jugada',
     inList: true,
     isError: false,
   },
   best: {
     label: 'Mejor',
-    color: '#81b64c',
+    color: 'var(--color-cls-best)',
+    textColor: 'var(--color-cls-best-text)',
     phrase: 'es la mejor jugada',
     inList: false,
     isError: false,
   },
   excellent: {
     label: 'Excelente',
-    color: '#81b64c',
+    color: 'var(--color-cls-excellent)',
+    textColor: 'var(--color-cls-excellent-text)',
     phrase: 'es excelente',
     inList: false,
     isError: false,
   },
-  good: { label: 'Buena', color: '#95b776', phrase: 'es buena', inList: false, isError: false },
-  book: { label: 'Teoría', color: '#a88865', phrase: 'es teoría', inList: false, isError: false },
+  good: {
+    label: 'Buena',
+    color: 'var(--color-cls-good)',
+    textColor: 'var(--color-cls-good-text)',
+    phrase: 'es buena',
+    inList: false,
+    isError: false,
+  },
+  book: {
+    label: 'Teoría',
+    color: 'var(--color-cls-book)',
+    textColor: 'var(--color-cls-book-text)',
+    phrase: 'es teoría',
+    inList: false,
+    isError: false,
+  },
   inaccuracy: {
     label: 'Imprecisión',
-    color: '#f7c631',
+    color: 'var(--color-cls-inaccuracy)',
+    textColor: 'var(--color-cls-inaccuracy-text)',
     phrase: 'es una imprecisión',
     inList: true,
     isError: true,
   },
-  mistake: { label: 'Error', color: '#ff9a3c', phrase: 'es un error', inList: true, isError: true },
+  mistake: {
+    label: 'Error',
+    color: 'var(--color-cls-mistake)',
+    textColor: 'var(--color-cls-mistake-text)',
+    phrase: 'es un error',
+    inList: true,
+    isError: true,
+  },
   blunder: {
     label: 'Grave error',
-    color: '#e5423a',
+    color: 'var(--color-cls-blunder)',
+    textColor: 'var(--color-cls-blunder-text)',
     phrase: 'es un grave error',
     inList: true,
     isError: true,
   },
   miss: {
     label: 'Oportunidad perdida',
-    color: '#ee6b6b',
+    color: 'var(--color-cls-miss)',
+    textColor: 'var(--color-cls-miss-text)',
     phrase: 'es una oportunidad perdida',
     inList: true,
     isError: true,

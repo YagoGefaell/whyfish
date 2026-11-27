@@ -9,12 +9,10 @@ from app.explain.service import explain
 from tests.explain import scenarios as s
 
 LEVEL1 = {
-    s.fools_mate_g4: "Esta jugada permite mate inmediato: [[Qh4#]]. Había que jugar [[e3]].",
-    s.queen_to_g5: (
-        "La dama queda sin defensa suficiente en g5: [[Nxg5]] la captura. Mejor era [[Nc6]]."
-    ),
+    s.fools_mate_g4: "Esta jugada permite mate inmediato: [[Qh4#]].",
+    s.queen_to_g5: ("La dama queda sin defensa suficiente en g5: [[Nxg5]] la captura."),
     s.knight_left_hanging: (
-        "Dejaste el caballo de c3 sin defensa suficiente: [[bxc3]] lo captura. Mejor era [[Nd5]]."
+        "Dejaste el caballo de c3 sin defensa suficiente: [[bxc3]] lo captura."
     ),
     s.only_move_nd5: (
         "[[Nd5]] era la única buena jugada: si [[Ke2]], sigue [[bxc3]] y se pierde el caballo "
@@ -22,7 +20,7 @@ LEVEL1 = {
     ),
     s.allows_fork: (
         "Esta jugada permite [[Nc7+]], que ataca a la vez el rey y la torre de a8: se pierde la "
-        "torre de a8. Mejor era [[Rb8]]."
+        "torre de a8."
     ),
     s.missed_knight: "[[Qxd5]] ganaba el caballo de d5.",
     s.takes_knight: "[[Qxd5]] captura el caballo de d5, que estaba sin defensa suficiente.",
@@ -72,7 +70,12 @@ def test_refs_point_to_the_line_of_each_mark() -> None:
     # Both lines start at the position before the move (ply 0 of this FEN-only game).
     assert [(r.san, r.line, r.base_ply, r.path) for r in e.refs] == [
         ("Nxg5", "played", 0, ("d8g5", "f3g5")),
-        ("Nc6", "best", 0, ("b8c6",)),
+    ]
+    # The best move is no longer appended ("Mejor era X"): it is referenced when the sentence is
+    # about it.
+    missed = explain(s.missed_knight(), 1, you=True)
+    assert [(r.san, r.line, r.base_ply, r.path) for r in missed.refs] == [
+        ("Qxd5", "best", 0, ("d1d5",)),
     ]
 
 

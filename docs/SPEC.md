@@ -304,7 +304,11 @@ Reglas para no afirmar de más (Fase 4):
 - **Nivel 1 (simple):** 1–2 frases, lenguaje llano, sin jerga innecesaria ni cifras de
   evaluación, centrado en *la idea principal* (qué amenaza no viste, qué pieza quedó colgada,
   qué ganaba la mejor jugada):
-  "Dejaste el caballo de f3 sin defensa; tras …[[Bxf3]] pierdes una pieza. Mejor era [[Be2]]."
+  "Dejaste el caballo de f3 sin defensa; tras …[[Bxf3]] pierdes una pieza."
+  El texto no repite lo que ya muestra la interfaz: la mejor jugada tiene su recuadro
+  («La mejor era X»), así que no se añade «Mejor era X.» al final (en un ejercicio, además,
+  delataría la solución). Solo aparece cuando la frase trata de ella («X ganaba…»,
+  «X era mejor: <motivo>»).
 - **Nivel 2 (profundizar):** 1 párrafo + variante comentada jugada a jugada, comparación
   hecha vs. mejor, concepto general aplicable ("antes de mover, revisa qué deja de defender la pieza").
 - **Ver por qué / Ver la idea (Fase 5):** el tablero reproduce la secuencia hasta el punto de

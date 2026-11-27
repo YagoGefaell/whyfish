@@ -26,6 +26,8 @@ const DB = process.env.WHYFISH_E2E_DB
 
 export default defineConfig({
   testDir: './e2e',
+  // The appearance screenshots (phase 6.5) only run with `make appearance-shots`.
+  testIgnore: process.env.APPEARANCE_SHOTS ? [] : ['**/appearance.spec.ts'],
   outputDir: resolve(ARTIFACTS, 'results'),
   timeout: 120_000,
   fullyParallel: false,

@@ -29,7 +29,7 @@ function renderPage() {
 }
 
 describe('SettingsPage', () => {
-  it('shows and saves the accounts', async () => {
+  it('saves the accounts on leaving the field, only when they changed', async () => {
     const calls = mockApi([
       { path: '/api/accounts', body: ACCOUNTS },
       { path: '/api/sync', body: IDLE },
@@ -43,13 +43,40 @@ describe('SettingsPage', () => {
     const lichess = await screen.findByLabelText('Usuario de Lichess')
     expect(lichess).toHaveValue('Yago')
     expect(screen.getByTestId('account-lichess')).toHaveTextContent('42 importadas')
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull()
+    // Leaving a field without changes saves nothing.
+    fireEvent.blur(lichess)
     fireEvent.change(lichess, { target: { value: 'yago2' } })
-    fireEvent.change(screen.getByLabelText('Usuario de Chess.com'), { target: { value: 'cc' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-    await screen.findByText('Cuentas guardadas.')
+    const chesscom = screen.getByLabelText('Usuario de Chess.com')
+    fireEvent.change(chesscom, { target: { value: 'cc' } })
+    fireEvent.blur(chesscom)
+    await screen.findByText('Guardado')
+    const puts = calls.filter((c) => c.method === 'PUT')
+    expect(puts).toHaveLength(1)
+    expect(puts[0]?.body).toEqual({ lichess: 'yago2', chesscom: 'cc' })
+  })
+
+  it('saves the training settings when they change', async () => {
+    const TRAINING = { session_size: 5, weak_new: 3, include_bullet: false, include_bot: true }
+    const calls = mockApi([
+      { path: '/api/accounts', body: ACCOUNTS },
+      { path: '/api/sync', body: IDLE },
+      { path: '/api/training/settings', body: TRAINING },
+      {
+        method: 'PUT',
+        path: '/api/training/settings',
+        body: { ...TRAINING, include_bullet: true },
+      },
+    ])
+    renderPage()
+    fireEvent.click(await screen.findByLabelText('Incluir errores de partidas bala'))
+    const section = await screen.findByRole('region', { name: 'Entrenamiento' })
+    await waitFor(() => {
+      expect(section).toHaveTextContent('Guardado')
+    })
     expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({
-      lichess: 'yago2',
-      chesscom: 'cc',
+      ...TRAINING,
+      include_bullet: true,
     })
   })
 

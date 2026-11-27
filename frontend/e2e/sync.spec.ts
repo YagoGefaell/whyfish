@@ -12,11 +12,16 @@ test('sync Lichess and Chess.com accounts, filter and analyse in the background'
   await page.goto('/settings')
   await page.getByLabel('Usuario de Lichess').fill('e2euser')
   await page.getByLabel('Usuario de Chess.com').fill('E2EUser') // case-insensitive
-  await page
-    .locator('form', { hasText: 'Tus cuentas' })
-    .getByRole('button', { name: 'Guardar' })
-    .click()
-  await expect(page.getByText('Cuentas guardadas.')).toBeVisible()
+  await page.getByLabel('Usuario de Chess.com').blur() // saved on leaving the field
+  // Saved (by this project or, unchanged, by an earlier one: then nothing is sent again).
+  await expect
+    .poll(async () => {
+      const body = (await (await page.request.get('/api/accounts')).json()) as {
+        accounts: { username: string }[]
+      }
+      return body.accounts.map((a) => a.username).sort()
+    })
+    .toEqual(['E2EUser', 'e2euser'])
   await shot(page, 'settings', project)
 
   // Historial: sync (the first project imports; the others find nothing new).

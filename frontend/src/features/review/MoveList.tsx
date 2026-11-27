@@ -23,28 +23,42 @@ export function MoveList({ moves, position, onSelect, firstMoveNumber, blackStar
   const selected = useRef<HTMLButtonElement | null>(null)
   const container = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    // Keep the selected move visible by scrolling the list only (never the page).
+    // Keep the selected move visible by scrolling the list only (never the page): on every
+    // move change and whenever the list is resized (the coach card above grows or shrinks).
     const box = container.current
-    const item = selected.current
-    if (!box || !item || box.scrollHeight <= box.clientHeight) return
-    const top = item.offsetTop - box.offsetTop
-    if (top < box.scrollTop) box.scrollTop = top - 8
-    else if (top + item.offsetHeight > box.scrollTop + box.clientHeight) {
-      box.scrollTop = top + item.offsetHeight - box.clientHeight + 8
+    if (!box) return
+    const reveal = () => {
+      const item = selected.current
+      if (!item || box.scrollHeight <= box.clientHeight) return
+      const b = box.getBoundingClientRect()
+      const r = item.getBoundingClientRect()
+      if (r.top < b.top) box.scrollTop -= b.top - r.top + 8
+      else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + 8
     }
-  }, [position])
+    reveal()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(reveal)
+    observer.observe(box)
+    return () => {
+      observer.disconnect()
+    }
+  }, [position, moves.length])
 
   const cells: (ListMove | null)[] = blackStarts ? [null, ...moves] : [...moves]
   const rows: (ListMove | null)[][] = []
   for (let i = 0; i < cells.length; i += 2) rows.push(cells.slice(i, i + 2))
 
   return (
-    <div ref={container} className="relative min-h-0 flex-1 overflow-y-auto">
+    <div
+      ref={container}
+      data-testid="move-list"
+      className="relative min-h-0 flex-1 overflow-y-auto"
+    >
       <ol aria-label="Jugadas" className="text-sm">
         {rows.map((row, r) => (
           <li
             key={r}
-            className="tabular grid grid-cols-[2.75rem_1fr_1fr] items-center gap-1 rounded odd:bg-white/[0.03]"
+            className="tabular grid grid-cols-[2.75rem_1fr_1fr] items-center gap-1 rounded odd:bg-overlay"
           >
             <span className="py-1 pl-2 text-muted">{firstMoveNumber + r}.</span>
             {[0, 1].map((c) => {
@@ -63,7 +77,7 @@ export function MoveList({ moves, position, onSelect, firstMoveNumber, blackStar
                     onSelect(move.ply + 1)
                   }}
                   className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-left font-medium ${
-                    isSelected ? 'bg-[#4b4844] text-fg' : 'text-fg/90 hover:bg-white/5'
+                    isSelected ? 'bg-selected text-fg' : 'text-fg/90 hover:bg-overlay'
                   }`}
                 >
                   {showBadge && move.classification && (

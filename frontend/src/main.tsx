@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.tsx'
 import './index.css'
+import { initPrefs } from './theme/prefs'
+
+initPrefs()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element #root not found')

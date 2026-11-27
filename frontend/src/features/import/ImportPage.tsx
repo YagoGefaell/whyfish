@@ -114,7 +114,7 @@ export function ImportPage() {
         <div
           role="alertdialog"
           aria-label="¿Quién eras tú?"
-          className="rounded-xl border border-[#f7c631]/40 bg-[#f7c631]/10 p-3"
+          className="rounded-xl border border-warn/40 bg-warn/10 p-3"
         >
           <p className="mb-2 font-medium">No he podido deducir tu color. ¿Quién eras tú?</p>
           <div className="flex flex-wrap gap-2">

@@ -36,9 +36,9 @@ export function TryIt({ state, side, busy, onRetry, onWhyAttempt, onSolution, on
       </div>
       {state.status === 'waiting' && <p>Busca la mejor jugada para {who} y hazla en el tablero.</p>}
       {state.status === 'checking' && <p className="text-muted">Comprobando tu jugada…</p>}
-      {state.status === 'error' && <p className="text-[#f87171]">{state.message}</p>}
+      {state.status === 'error' && <p className="text-bad">{state.message}</p>}
       {state.status === 'done' && state.result.correct && (
-        <p className="flex flex-wrap items-center gap-x-2 font-medium text-[#4ade80]">
+        <p className="flex flex-wrap items-center gap-x-2 font-medium text-good">
           <Check size={18} /> ¡Bien visto!{' '}
           {state.result.also.length > 0 ? (
             <span>

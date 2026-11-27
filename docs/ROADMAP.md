@@ -99,6 +99,21 @@ En tres subfases, cada una cerrable por separado.
   defecto), Leitner 5 cajas, sesión diaria de N, racha, filtros por tipo y fase. Partidas
   reales primero; las de contra el bot solo completan (opcional en Ajustes).
 
+## Fase 6.5 — Identidad propia y feedback
+Que la interfaz no se parezca a la de Chess.com y responda a lo que pasa en el tablero.
+- Interfaz limpia única sobre tokens, modo claro/oscuro/sistema. Paleta e insignias de
+  clasificación propias (símbolos !!, !, ?!, ?, ?? y nombres sin cambios), contraste ≥ 4.5:1.
+- Tablero (marrón, azul, gris, madera clara, pizarra) y piezas (cburnett, mpchess, chessnut,
+  rhosgfx, licencias libres) elegibles en Ajustes con vista previa; guardado en la base.
+- Sonidos con Web Audio (sin archivos): jugada, captura, jaque, enroque, coronación, ilegal, fin
+  de partida, ejercicios, consecuencia en "Ver por qué". Ajustes: activar, volumen (en la base) e
+  icono en la cabecera.
+- Feedback visual: ilegal (temblor), jaque, captura, tarjeta de fin de partida, acierto/fallo y
+  sesión completada; respeta `prefers-reduced-motion` y "Animaciones reducidas".
+- **Aceptación:** `make appearance-shots`; Vitest de contraste por modo y por tablero, y de
+  sonidos y efectos por evento (audio simulado); e2e con capturas de los estados de feedback y
+  el sonido desactivado.
+
 ## Fase 7 — Despliegue en Raspberry Pi (opcional)
 - Imagen Docker para ARM64 (o multi-arch) con frontend compilado servido por el backend.
 - `compose.yaml` con `restart: unless-stopped` y volumen para la base SQLite.
