@@ -2,6 +2,7 @@ import { History, Save } from 'lucide-react'
 import { useEffect, useState, type SyntheticEvent } from 'react'
 import { ApiError } from '../../api/client'
 import { syncApi, type Account, type Accounts } from '../../api/sync'
+import { trainingApi, type TrainingSettings } from '../../api/training'
 import { PLATFORM_LABEL, useSync } from '../sync/useSync'
 import { SyncProgress } from '../sync/SyncProgress'
 
@@ -27,7 +28,80 @@ function AccountStatus({ account }: { account: Account }) {
   )
 }
 
-/** Ajustes: Lichess / Chess.com accounts (phase 6a). */
+/** Training settings (phase 6c): session size, weak-point share of new ones, bullet games. */
+function TrainingSettingsForm() {
+  const [s, setS] = useState<TrainingSettings | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
+  useEffect(() => {
+    trainingApi
+      .settings()
+      .then(setS)
+      .catch(() => {
+        // The section stays hidden.
+      })
+  }, [])
+  if (!s) return null
+  const save = (event: SyntheticEvent) => {
+    event.preventDefault()
+    setSaved(null)
+    trainingApi
+      .saveSettings(s)
+      .then((next) => {
+        setS(next)
+        setSaved('Ajustes de entrenamiento guardados.')
+      })
+      .catch(() => {
+        setSaved('No se pudieron guardar.')
+      })
+  }
+  return (
+    <form onSubmit={save} className="panel flex flex-col gap-3 p-6" aria-label="Entrenamiento">
+      <h3 className="font-semibold">Entrenamiento</h3>
+      <label className="flex items-center justify-between gap-3">
+        <span>Ejercicios por sesión diaria</span>
+        <input
+          type="number"
+          min={1}
+          max={20}
+          className="field w-20"
+          value={s.session_size}
+          onChange={(e) => {
+            setS({ ...s, session_size: Number(e.target.value) })
+          }}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-3">
+        <span>Nuevos de tus puntos débiles (por sesión)</span>
+        <input
+          type="number"
+          min={0}
+          max={20}
+          className="field w-20"
+          value={s.weak_new}
+          onChange={(e) => {
+            setS({ ...s, weak_new: Number(e.target.value) })
+          }}
+        />
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={s.include_bullet}
+          onChange={(e) => {
+            setS({ ...s, include_bullet: e.target.checked })
+          }}
+        />
+        Incluir errores de partidas bala
+      </label>
+      {saved && <p role="status">{saved}</p>}
+      <button type="submit" className="btn self-start">
+        <Save size={16} /> Guardar
+      </button>
+    </form>
+  )
+}
+
+/** Ajustes: Lichess / Chess.com accounts (phase 6a), training (phase 6c). */
 export function SettingsPage() {
   const [data, setData] = useState<Accounts | null>(null)
   const [lichess, setLichess] = useState('')
@@ -118,6 +192,8 @@ export function SettingsPage() {
           <Save size={16} /> Guardar
         </button>
       </form>
+
+      <TrainingSettingsForm />
 
       {data.accounts.length > 0 && (
         <section className="panel flex flex-col gap-3 p-6">

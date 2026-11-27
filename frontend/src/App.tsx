@@ -1,4 +1,4 @@
-import { ChartColumn, FileUp, History, Settings, Swords } from 'lucide-react'
+import { ChartColumn, Dumbbell, FileUp, History, Settings, Swords } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { EngineStatus } from './components/EngineStatus'
@@ -9,6 +9,7 @@ import { PlayPage } from './features/play/PlayPage'
 import { ReviewPage } from './features/review/ReviewPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { StatsPage } from './features/stats/StatsPage'
+import { TrainPage } from './features/train/TrainPage'
 
 function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children: ReactNode }) {
   return (
@@ -47,6 +48,9 @@ export default function App() {
           <NavItem to="/stats" icon={<ChartColumn size={16} />}>
             Estadísticas
           </NavItem>
+          <NavItem to="/train" icon={<Dumbbell size={16} />}>
+            Entrenar
+          </NavItem>
           <NavItem to="/settings" icon={<Settings size={16} />}>
             Ajustes
           </NavItem>
@@ -64,6 +68,7 @@ export default function App() {
           <Route path="/review/:id" element={<ReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/train" element={<TrainPage />} />
           <Route path="*" element={<p>Página no encontrada.</p>} />
         </Routes>
       </main>

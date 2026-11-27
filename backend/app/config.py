@@ -265,3 +265,24 @@ class StatsThresholds:
 
 
 STATS = StatsThresholds()
+
+
+# --- Training (phase 6c) ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TrainingThresholds:
+    session_size: int = 5  # exercises of the daily session (changeable in Ajustes)
+    # Of the new exercises of a daily session, up to this many from the error kinds of the
+    # weak points ("Tus 3 puntos débiles"); the rest, the most recent errors.
+    weak_new: int = 3
+    # Leitner boxes 1-5: days until the exercise comes back; right in box 5 = learned.
+    intervals: tuple[int, ...] = (1, 2, 4, 8, 16)
+    # Not exercises: decided positions (win% before above / below 100 - this) and positions
+    # where the best move has this many equally good alternatives or more.
+    decided_above: float = 85.0
+    unclear_alternatives: int = 2
+    include_bullet: bool = False  # errors of bullet games (changeable in Ajustes)
+
+
+TRAINING = TrainingThresholds()

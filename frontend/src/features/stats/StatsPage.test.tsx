@@ -104,6 +104,10 @@ describe('StatsPage', () => {
       screen.getByText('El reloj te está costando partidas.', { exact: false }),
     ).toBeInTheDocument()
     expect(screen.getByText('Italian Game').closest('tr')).toHaveAttribute('data-worst', 'true')
+    expect(screen.getByRole('link', { name: 'Entrenar esto' })).toHaveAttribute(
+      'href',
+      '/train?error_kind=hanging&phase=middlegame',
+    )
   })
 
   it('filters: real games by default, bot games and pace on demand', async () => {

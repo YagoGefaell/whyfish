@@ -1,4 +1,4 @@
-import { ChevronDown, TriangleAlert } from 'lucide-react'
+import { ChevronDown, Dumbbell, TriangleAlert } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import type { TimeClass } from '../../api/games'
@@ -213,6 +213,14 @@ export function StatsPage() {
                     <Positions label="Ver ejemplos">
                       <Examples examples={w.examples.slice(0, 5)} label={`Ejemplos: ${w.title}`} />
                     </Positions>
+                    {Object.keys(w.train).length > 0 && (
+                      <Link
+                        className="btn self-start"
+                        to={`/train?${new URLSearchParams(w.train).toString()}`}
+                      >
+                        <Dumbbell size={14} /> Entrenar esto
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ol>

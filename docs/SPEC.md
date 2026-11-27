@@ -80,6 +80,31 @@
   ejemplos; llevan el filtro de entrenamiento de la 6c.
 - Todo lleva a las posiciones: `/review/:id?ply=N` abre la revisión en esa jugada.
 
+### 1.2d Entrenamiento con tus errores (Fase 6c)
+- **Ejercicios** («encuentra la mejor jugada») de tus ?, ?? y ✗ en partidas analizadas (de
+  los datos precalculados de la 6b). Fuera, guardando el motivo: **partida decidida** (ya ibas
+  por encima del 85 % —o por debajo del 15 %— antes de la última jugada del rival y sigues así;
+  la probabilidad de la posición sola no vale, porque incluye la táctica disponible y una ✗
+  parecería siempre «decidida») y **solución no clara** (la mejor tiene 2 o más alternativas
+  igual de buenas; con una, las dos cuentan). Los de partidas **bala**, fuera por defecto
+  (Ajustes).
+- **Corrección** como "Pruébalo tú": valor guardado o búsqueda conjunta con los límites del
+  análisis; cualquier jugada igual de buena (Δ < 1) es acierto.
+- **Cajas de Leitner** 1–5 (vuelven a 1, 2, 4, 8 y 16 días): acierto sube (un nuevo pasa a la
+  2), acierto en la 5 = aprendido; fallo = caja 1 y se repite una vez al final de la sesión.
+  Solo cuenta la primera respuesta.
+- **Sesión diaria** de N (5, en Ajustes): primero los que tocan hoy; los nuevos, hasta
+  `weak_new` (3) de los tipos de error de «Tus 3 puntos débiles» y el resto los errores más
+  recientes. Racha = días seguidos con la sesión diaria completa. **Sesión filtrada** por tipo,
+  fase o poco tiempo («Entrenar esto» en Estadísticas): un conjunto nuevo cada vez, no cuenta
+  para la racha.
+- **Presentación** sin revelar la solución: «Partida contra X (Chess.com, rápida), jugada 18,
+  juegas con negras», tablero orientado a tu color y quién mueve. ✗: «El rival acaba de
+  cometer un error: ¿cómo lo aprovechas?» con su última jugada resaltada; ? y ??: «Encuentra
+  la mejor jugada». Al acertar: lo que conseguía la mejor (nivel 1) y «Ver la idea»; al fallar:
+  «Intentar otra vez», «Ver por qué falla tu intento», «Ver la solución». El enlace a la
+  partida, solo después de resolverlo.
+
 ### 1.3 Revisión (Game Review)
 - **Mientras se analiza**, el tablero ya muestra la partida y el panel la barra de progreso.
 - **Primero el Resumen:** precisión de cada jugador (la del usuario destacada), tabla de
@@ -396,12 +421,17 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
   `POST /queue/resume` (cola de análisis).
 - `GET /stats?include_bot&time_class&color&days` → `{games_finished, games_unanalysed,
   insights_pending, stats}` (estadísticas, Fase 6b).
+- `GET /training/session?error_kind&phase&low_time` (sesión diaria o filtrada) ·
+  `GET /training/items/{id}` (posición y contexto, sin solución) ·
+  `POST /training/sessions/{id}/positions/{pos}/attempt {uci}` · `GET/PUT /training/settings`
+  (entrenamiento, Fase 6c).
 
 ## 7. Persistencia
 SQLite: `Game` (con origen online, ritmo, Elo), `Move` (con reloj), `AnalysisJob` (con
 intentos de la cola), `PositionAnalysis` (caché por posición + historia reversible + ajustes),
 `ImportAccount` (cuentas sincronizadas y su rango), `AppSetting` (ajustes clave/valor),
-`GameInsight` / `MoveInsight` (datos precalculados de las estadísticas). Migraciones con **Alembic**
+`GameInsight` / `MoveInsight` (datos precalculados de las estadísticas), `TrainingItem` /
+`TrainingSession` (ejercicios con su caja y sesiones). Migraciones con **Alembic**
 (`backend/migrations/`), aplicadas al arrancar; una base anterior a Alembic se marca con la
 revisión base y se migra.
 

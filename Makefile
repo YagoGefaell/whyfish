@@ -1,6 +1,6 @@
 BACKEND_PORT ?= 8000
 
-.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze explain-report why-report stats-report \
+.PHONY: help install dev dev-backend dev-frontend test test-backend test-frontend test-integration test-e2e install-e2e analyze explain-report why-report stats-report training-report \
         lint lint-backend lint-frontend fmt
 
 help:
@@ -13,6 +13,7 @@ help:
 	@echo "DATABASE_URL=sqlite:////tmp/x.db make explain-report  Explanations review report (HTML)"
 	@echo "DATABASE_URL=sqlite:////tmp/x.db make why-report      'Ver por qué' review report (HTML)"
 	@echo "DATABASE_URL=sqlite:////tmp/x.db make stats-report    Statistics report (HTML)"
+	@echo "DATABASE_URL=sqlite:////tmp/x.db make training-report Training report (HTML)"
 	@echo "make lint      ruff + mypy --strict, ESLint + Prettier + tsc"
 	@echo "make fmt       Auto-format backend and frontend"
 
@@ -62,6 +63,10 @@ why-report:
 stats-report:
 	@test -n "$(DATABASE_URL)" || (echo "Usage: DATABASE_URL=sqlite:////tmp/x.db make stats-report [OUT=file.html]" && exit 1)
 	cd backend && uv run python -m app.stats.report --out "$(abspath $(or $(OUT),docs/reports/stats-fase6b.html))"
+
+training-report:
+	@test -n "$(DATABASE_URL)" || (echo "Usage: DATABASE_URL=sqlite:////tmp/x.db make training-report [OUT=file.html]" && exit 1)
+	cd backend && uv run python -m app.training.report --out "$(abspath $(or $(OUT),docs/reports/training-fase6c.html))"
 
 lint: lint-backend lint-frontend
 

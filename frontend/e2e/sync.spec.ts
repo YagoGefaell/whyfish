@@ -12,7 +12,10 @@ test('sync Lichess and Chess.com accounts, filter and analyse in the background'
   await page.goto('/settings')
   await page.getByLabel('Usuario de Lichess').fill('e2euser')
   await page.getByLabel('Usuario de Chess.com').fill('E2EUser') // case-insensitive
-  await page.getByRole('button', { name: 'Guardar' }).click()
+  await page
+    .locator('form', { hasText: 'Tus cuentas' })
+    .getByRole('button', { name: 'Guardar' })
+    .click()
   await expect(page.getByText('Cuentas guardadas.')).toBeVisible()
   await shot(page, 'settings', project)
 

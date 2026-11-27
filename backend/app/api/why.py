@@ -13,6 +13,7 @@ from app.analysis.book import default_book
 from app.analysis.classify import MoveInput, classify, equal_moves
 from app.analysis.facts import MoveFacts, build_move_facts
 from app.analysis.positions import engine_board, terminal_eval
+from app.analysis.review import GameReview
 from app.analysis.runner import AnalysisEngineUnavailableError, AnalysisService
 from app.analysis.types import Classification, PositionEval
 from app.api.analysis import Analysis, MoveRefRead, Repo, _reviewed, get_pools
@@ -21,8 +22,9 @@ from app.config import FACTS, Settings
 from app.engine.pool import PoolManager
 from app.engine.stockfish import EngineUnavailableError
 from app.explain.idea import choose_idea
-from app.explain.service import facts_for_ply
+from app.explain.service import Explanation, explain, facts_for_ply
 from app.explain.why import Why, build_why, move_label, needs_extension, why_kind, why_line
+from app.play.service import LoadedGame
 
 router = APIRouter()
 
@@ -198,29 +200,29 @@ class TryRead(BaseModel):
     why: WhyRead | None  # why the attempt fails (None when it is correct)
 
 
-@router.post("/games/{game_id}/moves/{ply}/try")
-async def try_move(
-    game_id: int,
+async def judge_attempt(
+    service: AnalysisService,
+    loaded: LoadedGame,
+    evals: Sequence[PositionEval],
+    review: GameReview,
+    pools: PoolManager,
+    settings: Settings,
     ply: int,
-    body: TryRequest,
-    service: Analysis,
-    repo: Repo,
-    pools: Annotated[PoolManager, Depends(get_pools)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
+    uci: str,
 ) -> TryRead:
-    """ "Pruébalo tú": the user's attempt in the position before move `ply`.
+    """Judge an attempt in the position before move `ply` ("Pruébalo tú", training).
 
     Fair comparison (SPEC §5.4): an attempt that is one of the stored MultiPV lines keeps its
     stored value; any other is searched together with the stored best move (searchmoves) with
-    the same limits as the game analysis, so both scores come from the same search.
+    the same limits as the game analysis, so both scores come from the same search. Any move
+    as good as the best (★, !, !!) is right.
     """
-    loaded, evals, review = _reviewed(game_id, service, repo)
     ucis = [m.uci for m in loaded.moves]
     if not 0 <= ply < len(ucis):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Jugada no encontrada.")
     board = _game_board(loaded.game.initial_fen, ucis, ply)
     try:
-        move = chess.Move.from_uci(body.uci)
+        move = chess.Move.from_uci(uci)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Jugada no válida.") from exc
     if move not in board.legal_moves:
@@ -272,3 +274,37 @@ async def try_move(
         also=list(dict.fromkeys(also)),
         why=why,
     )
+
+
+def best_explanation(
+    loaded: LoadedGame, evals: Sequence[PositionEval], review: GameReview, ply: int
+) -> Explanation | None:
+    """Level-1 explanation of the best move in the position before move `ply` (what it
+    achieved), told to the user; None if there is nothing to say."""
+    best = evals[ply].lines[0] if evals[ply].lines else None
+    if best is None:
+        return None
+    ucis = [m.uci for m in loaded.moves]
+    board = _game_board(loaded.game.initial_fen, ucis, ply)
+    previous = review.moves[ply - 1].classification if ply > 0 else None
+    facts = _facts_for(
+        board, chess.Move.from_uci(best.move), evals[ply], PositionEval(lines=()), ply, previous
+    )
+    facts = replace(facts, classification=C.BEST)
+    explanation = explain(facts, 1, you=True)
+    return explanation if explanation.text else None
+
+
+@router.post("/games/{game_id}/moves/{ply}/try")
+async def try_move(
+    game_id: int,
+    ply: int,
+    body: TryRequest,
+    service: Analysis,
+    repo: Repo,
+    pools: Annotated[PoolManager, Depends(get_pools)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> TryRead:
+    """ "Pruébalo tú": the user's attempt in the position before move `ply`."""
+    loaded, evals, review = _reviewed(game_id, service, repo)
+    return await judge_attempt(service, loaded, evals, review, pools, settings, ply, body.uci)
