@@ -283,6 +283,8 @@ class TrainingThresholds:
     decided_above: float = 85.0
     unclear_alternatives: int = 2
     include_bullet: bool = False  # errors of bullet games (changeable in Ajustes)
+    # Errors of games against the bot: only when no real game's exercise is left (Ajustes).
+    include_bot: bool = True
 
 
 TRAINING = TrainingThresholds()

@@ -62,6 +62,8 @@ export interface TrainingSettings {
   session_size: number
   weak_new: number
   include_bullet: boolean
+  /** Games against the bot: only when no real game's exercise is left. */
+  include_bot: boolean
 }
 
 export interface TrainingFilter {

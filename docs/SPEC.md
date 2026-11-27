@@ -93,6 +93,10 @@
 - **Cajas de Leitner** 1–5 (vuelven a 1, 2, 4, 8 y 16 días): acierto sube (un nuevo pasa a la
   2), acierto en la 5 = aprendido; fallo = caja 1 y se repite una vez al final de la sesión.
   Solo cuenta la primera respuesta.
+- **Partidas reales primero** (Chess.com, Lichess, PGN importados), en la sesión diaria y en
+  las filtradas: los ejercicios de partidas contra el bot solo completan los huecos cuando no
+  quedan de partidas reales (en el mismo orden). Ajustes: «Incluir partidas contra el bot»
+  (activada por defecto).
 - **Sesión diaria** de N (5, en Ajustes): primero los que tocan hoy; los nuevos, hasta
   `weak_new` (3) de los tipos de error de «Tus 3 puntos débiles» y el resto los errores más
   recientes. Racha = días seguidos con la sesión diaria completa. **Sesión filtrada** por tipo,

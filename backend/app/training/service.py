@@ -20,7 +20,7 @@ from app.analysis.runner import AnalysisNotReadyError, AnalysisService
 from app.analysis.types import PositionEval
 from app.analysis.winprob import position_win
 from app.config import TRAINING, TrainingThresholds
-from app.models.game import Game, utcnow
+from app.models.game import Game, GameSource, utcnow
 from app.models.insight import GameInsight, MoveInsight
 from app.models.training import TrainingItem, TrainingSession
 from app.settings_store import get_setting, set_setting
@@ -30,6 +30,7 @@ from app.training.logic import Box, Candidate, Filter, after_attempt, pick_sessi
 
 ERRORS = ("mistake", "blunder", "miss")
 SIZE, WEAK_NEW, BULLET = "training_session_size", "training_weak_new", "training_include_bullet"
+BOT = "training_include_bot"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class TrainingSettings:
     session_size: int
     weak_new: int
     include_bullet: bool
+    include_bot: bool = True  # games against the bot, only when no real ones are left
 
 
 @dataclass(frozen=True)
@@ -86,12 +88,14 @@ class TrainingService:
             weak_new=int(get_setting(self._db, WEAK_NEW, str(self._t.weak_new))),
             include_bullet=get_setting(self._db, BULLET, "1" if self._t.include_bullet else "0")
             == "1",
+            include_bot=get_setting(self._db, BOT, "1" if self._t.include_bot else "0") == "1",
         )
 
     def set_settings(self, s: TrainingSettings) -> TrainingSettings:
         set_setting(self._db, SIZE, str(max(1, min(20, s.session_size))))
         set_setting(self._db, WEAK_NEW, str(max(0, s.weak_new)))
         set_setting(self._db, BULLET, "1" if s.include_bullet else "0")
+        set_setting(self._db, BOT, "1" if s.include_bot else "0")
         return self.settings()
 
     # --- Exercises ----------------------------------------------------------------
@@ -160,6 +164,7 @@ class TrainingService:
                 low_time=item.low_time,
                 time_class=game.time_class,
                 played_at=game.played_at or game.created_at,
+                real=game.source == GameSource.IMPORTED,
             )
             for item, game in rows
         ]
@@ -199,6 +204,7 @@ class TrainingService:
             s.weak_new,
             flt,
             s.include_bullet,
+            s.include_bot,
         )
         created = TrainingSession(
             day=today,
@@ -269,7 +275,7 @@ class TrainingService:
 
     def counts(self, today: date) -> dict[str, int]:
         s = self.settings()
-        out = {"due": 0, "new": 0, "learned": 0, "decided": 0, "unclear": 0, "bullet": 0}
+        out = {"due": 0, "new": 0, "learned": 0, "decided": 0, "unclear": 0, "bullet": 0, "bot": 0}
         for c in self.candidates():
             if c.excluded is not None:
                 out[c.excluded] = out.get(c.excluded, 0) + 1
@@ -277,6 +283,8 @@ class TrainingService:
                 out["learned"] += 1
             elif not s.include_bullet and c.time_class == "bullet":
                 out["bullet"] += 1
+            elif not s.include_bot and not c.real:
+                out["bot"] += 1
             elif c.box == 0:
                 out["new"] += 1
             elif c.due_on is not None and c.due_on <= today:

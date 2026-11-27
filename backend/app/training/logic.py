@@ -38,6 +38,7 @@ class Candidate:
     low_time: bool | None
     time_class: str | None
     played_at: datetime
+    real: bool = True  # a real game (Lichess, Chess.com, PGN); False = against the bot
 
 
 @dataclass(frozen=True)
@@ -68,33 +69,42 @@ def pick_session(
     weak_new: int,
     flt: Filter,
     include_bullet: bool,
+    include_bot: bool = True,
 ) -> list[int]:
-    """Exercises due today (oldest due first), then new ones: in the daily session up to
-    `weak_new` of them from the weak points' error kinds, the rest the most recent errors."""
+    """Real games first: their exercises due today (oldest due first), then their new ones
+    (in the daily session up to `weak_new` from the weak points' error kinds, the rest the
+    most recent errors). Exercises of games against the bot only fill the slots left, in the
+    same order, and only with `include_bot`."""
     eligible = [
         c
         for c in candidates
         if c.excluded is None
         and not c.learned
         and (include_bullet or c.time_class != "bullet")
+        and (include_bot or c.real)
         and flt.accepts(c)
     ]
-    due = sorted(
-        (c for c in eligible if c.box > 0 and c.due_on is not None and c.due_on <= today),
-        key=lambda c: (c.due_on, c.box, c.id),
-    )
-    chosen = [c.id for c in due[:size]]
-    slots = size - len(chosen)
-    fresh = sorted((c for c in eligible if c.box == 0), key=lambda c: (c.played_at, c.id))
-    fresh.reverse()  # most recent first
-    if slots <= 0:
-        return chosen
-    weak: list[Candidate] = []
-    if flt.empty:
-        weak = [c for c in fresh if c.error_kind in weak_kinds][: min(weak_new, slots)]
-    rest = [c for c in fresh if c not in weak]
-    picked = weak + rest[: slots - len(weak)]
-    return chosen + [c.id for c in picked]
+    chosen: list[int] = []
+    weak_left = weak_new if flt.empty else 0
+    for real in (True, False):
+        group = [c for c in eligible if c.real == real]
+        due = sorted(
+            (c for c in group if c.box > 0 and c.due_on is not None and c.due_on <= today),
+            key=lambda c: (c.due_on, c.box, c.id),
+        )
+        chosen += [c.id for c in due[: size - len(chosen)]]
+        slots = size - len(chosen)
+        if slots <= 0:
+            break
+        fresh = sorted((c for c in group if c.box == 0), key=lambda c: (c.played_at, c.id))
+        fresh.reverse()  # most recent first
+        weak = [c for c in fresh if c.error_kind in weak_kinds][: min(weak_left, slots)]
+        weak_left -= len(weak)
+        rest = [c for c in fresh if c not in weak]
+        chosen += [c.id for c in weak + rest[: slots - len(weak)]]
+        if len(chosen) >= size:
+            break
+    return chosen
 
 
 def streak(completed_days: Iterable[date], today: date) -> int:

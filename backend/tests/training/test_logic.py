@@ -29,9 +29,10 @@ def c(
     excluded: str | None = None,
     learned: bool = False,
     low: bool | None = None,
+    real: bool = True,
 ) -> Candidate:
     played = datetime(2026, 11, 1, tzinfo=UTC) + timedelta(days=i)
-    return Candidate(i, box, due, learned, excluded, kind, phase, low, tc, played)
+    return Candidate(i, box, due, learned, excluded, kind, phase, low, tc, played, real)
 
 
 def test_due_first_then_weak_kinds_then_most_recent() -> None:
@@ -65,6 +66,26 @@ def test_bullet_on_demand_and_filtered_session() -> None:
     flt = Filter(error_kind="hanging", phase="middlegame")
     assert pick_session(items, TODAY, 5, [], 3, flt, False) == [3]
     assert pick_session(items, TODAY, 5, [], 3, Filter(low_time=True), False) == [4]
+
+
+def test_real_games_first_bot_games_fill_the_rest() -> None:
+    items = [
+        c(1, box=2, due=TODAY, real=False),  # due, but from a game against the bot
+        c(2, real=False, kind="hanging"),  # the most recent, weak kind, against the bot
+        c(3, real=False),
+        c(4),
+        c(5, kind="hanging"),
+        c(6, box=2, due=TODAY - timedelta(days=1)),
+    ]
+    # Real ones first (due, weak kind, most recent); the bot's only fill the slots left.
+    assert pick_session(items, TODAY, 3, ["hanging"], 3, Filter(), False) == [6, 5, 4]
+    assert pick_session(items, TODAY, 5, ["hanging"], 3, Filter(), False) == [6, 5, 4, 1, 2]
+    assert pick_session(items, TODAY, 9, ["hanging"], 1, Filter(), False) == [6, 5, 4, 1, 3, 2]
+    # Filtered sessions too.
+    flt = Filter(error_kind="hanging")
+    assert pick_session(items, TODAY, 2, [], 3, flt, False) == [5, 2]
+    # Without the bot's games.
+    assert pick_session(items, TODAY, 9, ["hanging"], 3, Filter(), False, False) == [6, 5, 4]
 
 
 def test_streak() -> None:

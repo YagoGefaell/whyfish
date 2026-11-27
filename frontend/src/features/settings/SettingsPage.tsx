@@ -93,6 +93,21 @@ function TrainingSettingsForm() {
         />
         Incluir errores de partidas bala
       </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={s.include_bot}
+          onChange={(e) => {
+            setS({ ...s, include_bot: e.target.checked })
+          }}
+        />
+        <span>
+          Incluir partidas contra el bot{' '}
+          <span className="text-sm text-muted">
+            (solo cuando no quedan ejercicios de tus partidas reales)
+          </span>
+        </span>
+      </label>
       {saved && <p role="status">{saved}</p>}
       <button type="submit" className="btn self-start">
         <Save size={16} /> Guardar

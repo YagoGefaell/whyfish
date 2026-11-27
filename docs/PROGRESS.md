@@ -3,8 +3,8 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 6a (importación) y 6b (estadísticas) — **cerradas** (2026-11-27). Fase 6c (entrenamiento) —
-**implementada, pendiente del OK del usuario** (informe `docs/reports/training-fase6c.html`).
+Fase 6 (aprendizaje a largo plazo: 6a importación, 6b estadísticas, 6c entrenamiento) —
+**cerrada** (2026-11-27). Siguiente: Fase 7 (Raspberry Pi), sin empezar.
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -288,7 +288,7 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   no cuenta como punto débil; coste de una apertura = sus errores en la fase de apertura.
 - **Tests:** backend 366, frontend 67, e2e 18.
 
-### Fase 6c — Entrenamiento (pendiente de OK)
+### Fase 6c — Entrenamiento (cerrada 2026-11-27)
 - **Backend:** `app/training/` (`logic.py` puro: Leitner, selección de la sesión con prioridad
   para los puntos débiles, racha; `service.py`: ejercicios desde los datos de la 6b con
   exclusiones guardadas, ajustes, sesiones, registro de respuestas; `report.py`),
@@ -300,18 +300,21 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   con «Intentar otra vez» / «Ver por qué falla tu intento» / «Ver la solución», reproducciones
   con los componentes de "Ver por qué", enlace a la partida tras resolverlo), «Entrenar esto»
   en Estadísticas, sección Entrenamiento en Ajustes.
-- **Decisiones por defecto (a revisar):** «partida decidida» = ya decidida antes de la última
-  jugada del rival y todavía (con la regla literal, todas las ✗ quedarían fuera); las sesiones
-  filtradas son un conjunto nuevo cada vez (la diaria, una por día); entran también los errores
-  de partidas contra el bot; un nuevo acertado pasa directamente a la caja 2.
+- **Decisiones (aprobadas por el usuario):** «partida decidida» = ya decidida antes de la
+  última jugada del rival y todavía (con la regla literal, todas las ✗ quedarían fuera); las
+  sesiones filtradas son un conjunto nuevo cada vez (la diaria, una por día); un nuevo acertado
+  pasa directamente a la caja 2; **partidas reales primero** (Chess.com, Lichess, PGN) en la
+  sesión diaria y en las filtradas, las de contra el bot solo completan los huecos, con la
+  casilla «Incluir partidas contra el bot» en Ajustes (activada por defecto).
 - **Informe:** `docs/reports/training-fase6c.html` (`make training-report`), sobre una copia
   temporal de la base del usuario + sus partidas de Chess.com: 227 posiciones, 189 ejercicios
-  nuevos; fuera 20 decididas, 16 sin solución clara, 2 de bala. Los 10 primeros salen de
-  partidas contra el bot (son las más recientes): pendiente de decidir si dar prioridad a las
-  partidas reales, como en las estadísticas.
+  nuevos; fuera 20 decididas, 16 sin solución clara, 2 de bala. Con la prioridad de partidas
+  reales, los 10 primeros salen de partidas de Chess.com (antes, todos de partidas contra el
+  bot, las más recientes).
+- **Tests:** backend 374, frontend 69, e2e 21 (6 omitidos por viewport).
 
 ## Pendiente / siguiente paso
-- OK de la 6c del usuario.
+- Fase 7 (despliegue en Raspberry Pi): plan y OK del usuario antes de empezar.
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
   `make explain-report`); no se ha regenerado tras los ajustes de cierre de la Fase 5 (cambian
   el nivel 2 comparativo y algunas clasificaciones).

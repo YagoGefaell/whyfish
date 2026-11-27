@@ -51,6 +51,7 @@ class SettingsRead(BaseModel):
     session_size: int
     weak_new: int
     include_bullet: bool
+    include_bot: bool = True  # games against the bot, after the real ones
 
 
 class PositionRead(BaseModel):
@@ -238,15 +239,21 @@ async def attempt(
 def get_training_settings(training: Training) -> SettingsRead:
     s = training.settings()
     return SettingsRead(
-        session_size=s.session_size, weak_new=s.weak_new, include_bullet=s.include_bullet
+        session_size=s.session_size,
+        weak_new=s.weak_new,
+        include_bullet=s.include_bullet,
+        include_bot=s.include_bot,
     )
 
 
 @router.put("/training/settings")
 def put_training_settings(body: SettingsRead, training: Training) -> SettingsRead:
     s = training.set_settings(
-        TrainingSettings(body.session_size, body.weak_new, body.include_bullet)
+        TrainingSettings(body.session_size, body.weak_new, body.include_bullet, body.include_bot)
     )
     return SettingsRead(
-        session_size=s.session_size, weak_new=s.weak_new, include_bullet=s.include_bullet
+        session_size=s.session_size,
+        weak_new=s.weak_new,
+        include_bullet=s.include_bullet,
+        include_bot=s.include_bot,
     )

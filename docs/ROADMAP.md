@@ -75,7 +75,7 @@ Que el usuario **vea** la secuencia entera que lleva a la consecuencia de una ju
   plies hasta la captura y la recaptura, con el resumen correcto; e2e con captura en mitad de la
   reproducción y en la tarjeta final, en escritorio y móvil.
 
-## Fase 6 — Aprendizaje a largo plazo (opcional)
+## Fase 6 — Aprendizaje a largo plazo (opcional) — cerrada (2026-11-27)
 En tres subfases, cada una cerrable por separado.
 
 ### 6a — Importación automática
@@ -96,7 +96,8 @@ En tres subfases, cada una cerrable por separado.
 
 ### 6c — Entrenamiento con mis errores
 - Ejercicios de tus ?, ?? y ✗ (sin posiciones decididas, sin solución poco clara, sin bala por
-  defecto), Leitner 5 cajas, sesión diaria de N, racha, filtros por tipo y fase.
+  defecto), Leitner 5 cajas, sesión diaria de N, racha, filtros por tipo y fase. Partidas
+  reales primero; las de contra el bot solo completan (opcional en Ajustes).
 
 ## Fase 7 — Despliegue en Raspberry Pi (opcional)
 - Imagen Docker para ARM64 (o multi-arch) con frontend compilado servido por el backend.

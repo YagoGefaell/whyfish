@@ -56,9 +56,15 @@ def test_session_wrong_then_right_and_streak(client: TestClient, fake_engine: Fa
 
 def test_settings_and_filtered_session(client: TestClient, fake_engine: FakeEngine) -> None:
     body = client.put(
-        "/api/training/settings", json={"session_size": 8, "weak_new": 2, "include_bullet": True}
+        "/api/training/settings",
+        json={"session_size": 8, "weak_new": 2, "include_bullet": True, "include_bot": False},
     ).json()
-    assert body == {"session_size": 8, "weak_new": 2, "include_bullet": True}
+    assert body == {"session_size": 8, "weak_new": 2, "include_bullet": True, "include_bot": False}
+    assert client.get("/api/training/settings").json()["include_bot"] is False
+    client.put(
+        "/api/training/settings",
+        json={"session_size": 8, "weak_new": 2, "include_bullet": True, "include_bot": True},
+    )
     analysed(client, fake_engine)
     wait_insights(client)
     filtered = client.get("/api/training/session?error_kind=allows_mate&phase=opening").json()

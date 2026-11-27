@@ -4,8 +4,8 @@
     DATABASE_URL=sqlite:////tmp/x.db uv run python -m app.training.report --out report.html
 
 Creates the exercises of the analysed games (as the app does), picks the first ones the way
-the daily session does (due first, then new ones with priority for the weak points' error
-kinds) and shows each with its position, wording, context, solution, kind and why it is
+the daily session does (real games first: due, then new ones with priority for the weak
+points' error kinds; games against the bot only fill the slots left) and shows each with its position, wording, context, solution, kind and why it is
 included; plus examples of positions excluded as decided or without a clear solution.
 """
 
@@ -161,7 +161,14 @@ def main() -> None:
     s = training.settings()
     weak_new = round(s.weak_new * args.size / max(1, s.session_size))
     ids = pick_session(
-        training.candidates(), date.today(), args.size, weak, weak_new, Filter(), s.include_bullet
+        training.candidates(),
+        date.today(),
+        args.size,
+        weak,
+        weak_new,
+        Filter(),
+        s.include_bullet,
+        s.include_bot,
     )
     counts = training.counts(date.today())
     with Session(db) as session:
@@ -192,9 +199,11 @@ h3 {{ margin: 0 0 6px; }}
 <p>Ejercicios creados de tus errores (?, ?? y ✗) en partidas analizadas: {len(items)} posiciones
 ({created} creadas ahora). Disponibles: {counts["new"]} nuevos y {counts["due"]} para repasar hoy;
 fuera: {counts["decided"]} con la partida ya decidida, {counts["unclear"]} sin una solución clara,
-{counts["bullet"]} de bala (excluidas por defecto). Tus puntos débiles: {html.escape(weak_txt)}.</p>
+{counts["bullet"]} de bala (excluidas por defecto){f", {counts['bot']} contra el bot (desactivadas)" if counts["bot"] else ""}. Tus puntos débiles: {html.escape(weak_txt)}.</p>
 <p>Abajo, los {len(ids)} primeros ejercicios tal como los elegiría la sesión diaria (con {args.size}
-ejercicios: hasta {weak_new} nuevos de tus puntos débiles, el resto los errores más recientes). El
+ejercicios: primero los de tus partidas reales —Chess.com, Lichess, PGN—, hasta {weak_new} nuevos de
+tus puntos débiles y el resto los errores más recientes; los de partidas contra el bot solo
+completan los huecos{"" if s.include_bot else " y ahora están desactivados"}). El
 tablero es la posición que verías (orientada a tu color); en las ✗ se resalta la última jugada del
 rival. La solución y la explicación solo se muestran al resolverlo.</p>
 <h2>Ejercicios</h2>
