@@ -9,6 +9,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 const BACKEND_PORT = 8765
 const FRONTEND_PORT = 5180
+const PLATFORMS_PORT = 8766 // fake Lichess / Chess.com (e2e/fake_platforms.py)
 const ARTIFACTS = resolve(import.meta.dirname, 'e2e-artifacts')
 
 // Playwright loads this file again in every worker process. Pick the database once, in the
@@ -47,6 +48,12 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: `python3 e2e/fake_platforms.py ${String(PLATFORMS_PORT)}`,
+      url: `http://127.0.0.1:${String(PLATFORMS_PORT)}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
       command: `uv run uvicorn app.main:app --host 127.0.0.1 --port ${String(BACKEND_PORT)}`,
       cwd: resolve(import.meta.dirname, '../backend'),
       env: {
@@ -56,6 +63,8 @@ export default defineConfig({
         BOT_MOVETIME_S: '0.05',
         WHY_STEP_MS: '400',
         BOT_THINK_SCALE: '0', // no minimum "thinking" time for the bot in tests
+        LICHESS_URL: `http://127.0.0.1:${String(PLATFORMS_PORT)}/lichess`,
+        CHESSCOM_URL: `http://127.0.0.1:${String(PLATFORMS_PORT)}/chesscom`,
       },
       url: `http://127.0.0.1:${String(BACKEND_PORT)}/api/health`,
       reuseExistingServer: false,

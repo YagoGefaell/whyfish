@@ -1,6 +1,8 @@
 """A pool of engines for analysis, separate from the play engine."""
 
 import asyncio
+import heapq
+import itertools
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -10,24 +12,52 @@ from app.engine.stockfish import Engine
 EngineFactory = Callable[[Settings], Awaitable[Engine]]
 
 
+# Who asks for an engine (lower goes first): what the user is waiting for right now (explore,
+# "Ver por qué", "Pruébalo tú"), then the full analysis of a game they opened, then the
+# background queue (phase 6a).
+INTERACTIVE = 0
+FOREGROUND = 1
+BACKGROUND = 2
+
+
 class EnginePool:
+    """Engines handed out by priority (then in arrival order) as they become free."""
+
     def __init__(self, engines: list[Engine]) -> None:
         self._engines = engines
-        self._idle: asyncio.Queue[Engine] = asyncio.Queue()
-        for engine in engines:
-            self._idle.put_nowait(engine)
+        self._idle: list[Engine] = list(engines)
+        self._waiters: list[tuple[int, int, asyncio.Future[Engine]]] = []
+        self._order = itertools.count()
 
     @property
     def size(self) -> int:
         return len(self._engines)
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[Engine]:
-        engine = await self._idle.get()
+    async def acquire(self, priority: int = INTERACTIVE) -> AsyncIterator[Engine]:
+        if self._idle and not self._waiters:
+            engine = self._idle.pop()
+        else:
+            future: asyncio.Future[Engine] = asyncio.get_running_loop().create_future()
+            heapq.heappush(self._waiters, (priority, next(self._order), future))
+            try:
+                engine = await future
+            except asyncio.CancelledError:
+                if future.done() and not future.cancelled():
+                    self._release(future.result())  # handed over just as we were cancelled
+                raise
         try:
             yield engine
         finally:
-            self._idle.put_nowait(engine)
+            self._release(engine)
+
+    def _release(self, engine: Engine) -> None:
+        while self._waiters:
+            _, _, future = heapq.heappop(self._waiters)
+            if not future.done():
+                future.set_result(engine)
+                return
+        self._idle.append(engine)
 
     async def close(self) -> None:
         await asyncio.gather(*(e.close() for e in self._engines), return_exceptions=True)

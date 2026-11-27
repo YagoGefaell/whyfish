@@ -20,7 +20,7 @@ from sqlmodel import Session, col, select
 from app.analysis.positions import GamePosition, engine_board, game_positions, position_key
 from app.analysis.types import EngineLine, PositionEval
 from app.config import Settings
-from app.engine.pool import EnginePool, PoolManager
+from app.engine.pool import BACKGROUND, FOREGROUND, EnginePool, PoolManager
 from app.models.analysis import AnalysisJob, AnalysisStatus, PositionAnalysis
 from app.models.game import utcnow
 from app.play.service import GameRepository, GameRuleError
@@ -53,11 +53,19 @@ async def evaluate_positions(
     limit: chess.engine.Limit,
     multipv: int,
     on_result: Callable[[GamePosition, tuple[EngineLine, ...]], Awaitable[None] | None],
+    priority: Callable[[], int] = lambda: FOREGROUND,
+    concurrency: int | None = None,
 ) -> None:
-    """Analyse `positions` in parallel with the pool; call `on_result` as each one finishes."""
+    """Analyse `positions` in parallel with the pool; call `on_result` as each one finishes.
+
+    `priority` is asked for each position (a background analysis may be promoted while it
+    runs); `concurrency` caps how many engines it uses at once (the background queue leaves
+    some free for interactive use).
+    """
+    gate = asyncio.Semaphore(concurrency) if concurrency else contextlib.nullcontext()
 
     async def work(position: GamePosition) -> None:
-        async with pool.acquire() as engine:
+        async with gate, pool.acquire(priority()) as engine:
             lines = await engine.analyse(position.board, limit, multipv)
         maybe = on_result(position, lines)
         if maybe is not None:
@@ -89,6 +97,9 @@ class AnalysisService:
         self._tasks: dict[int, asyncio.Task[None]] = {}
         self._one_at_a_time = asyncio.Lock()
         self._changed = asyncio.Condition()
+        # Games the background queue is analysing / that the user asked for meanwhile.
+        self._background: set[int] = set()
+        self._promoted: set[int] = set()
 
     # --- Lifecycle --------------------------------------------------------
 
@@ -222,6 +233,8 @@ class AnalysisService:
             if job is not None:
                 busy = job.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING)
                 done = job.status is AnalysisStatus.DONE and job.settings_key == key
+                if busy and game_id in self._background:
+                    self._promoted.add(game_id)  # the user is waiting for it now
                 if busy or done:
                     return job
             else:
@@ -238,6 +251,41 @@ class AnalysisService:
         self._tasks[game_id] = asyncio.create_task(self._run(game_id, key))
         return job
 
+    async def analyse_background(self, game_id: int) -> bool:
+        """Analyse a game for the background queue (lower priority, fewer engines). Returns
+        whether it ended DONE. Counts the attempt (a failed game is retried once)."""
+        name = self._engine_name()
+        if name is None:
+            raise AnalysisEngineUnavailableError("El motor no está disponible.")
+        key = settings_key(name, self._settings)
+        with Session(self._db) as session:
+            job = session.exec(select(AnalysisJob).where(AnalysisJob.game_id == game_id)).first()
+            if job is None:
+                job = AnalysisJob(game_id=game_id, settings_key=key, status=AnalysisStatus.PENDING)
+            elif job.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING):
+                return False  # the user started it meanwhile
+            job.settings_key = key
+            job.status = AnalysisStatus.PENDING
+            job.done = job.total = 0
+            job.error = None
+            job.finished_at = None
+            job.attempts += 1
+            session.add(job)
+            session.commit()
+        self._background.add(game_id)
+        try:
+            await self._analyse(game_id, key, background=True)
+            return True
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("Background analysis of game %s failed", game_id)
+            await self._update(game_id, status=AnalysisStatus.FAILED, error=f"Error: {exc}")
+            return False
+        finally:
+            self._background.discard(game_id)
+            self._promoted.discard(game_id)
+
     async def _run(self, game_id: int, key: str) -> None:
         try:
             async with self._one_at_a_time:
@@ -250,7 +298,7 @@ class AnalysisService:
         finally:
             self._tasks.pop(game_id, None)
 
-    async def _analyse(self, game_id: int, key: str) -> None:
+    async def _analyse(self, game_id: int, key: str, background: bool = False) -> None:
         with Session(self._db) as session:
             loaded = GameRepository(session).load(game_id)
             positions = game_positions(loaded.game.initial_fen, [m.uci for m in loaded.moves])
@@ -284,13 +332,20 @@ class AnalysisService:
                 done += 1
                 await self._update(game_id, done=done)
 
+            def priority() -> int:
+                promoted = game_id in self._promoted
+                return BACKGROUND if background and not promoted else FOREGROUND
+
             async with self._pools.use() as pool:
+                reserved = self._settings.queue_reserved_engines
                 await evaluate_positions(
                     missing,
                     pool,
                     search_limit(self._settings),
                     self._settings.analysis_multipv,
                     save,
+                    priority=priority,
+                    concurrency=max(1, pool.size - reserved) if background else None,
                 )
         await self._update(game_id, status=AnalysisStatus.DONE, finished=True)
 

@@ -5,7 +5,8 @@ from sqlalchemy import Connection, create_engine
 from sqlmodel import SQLModel
 
 import app.models.analysis
-import app.models.game  # noqa: F401
+import app.models.game
+import app.models.sync  # noqa: F401
 from app.config import get_settings
 
 target_metadata = SQLModel.metadata

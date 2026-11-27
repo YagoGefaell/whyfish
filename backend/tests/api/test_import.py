@@ -59,7 +59,7 @@ def test_color_required_when_it_cannot_be_detected(client: TestClient) -> None:
         "white": "Paul Morphy",
         "black": "Duke Karl",
     }
-    assert client.get("/api/games").json() == []
+    assert client.get("/api/games").json()["items"] == []
 
 
 def test_invalid_pgn(client: TestClient) -> None:
@@ -97,12 +97,16 @@ def test_pgn_export_keeps_the_original_headers(client: TestClient) -> None:
 
 def test_history_shows_source_names_and_analysis_status(client: TestClient) -> None:
     gid = import_pgn(client, pgn=OPERA, user_color="white").json()["game"]["id"]
-    [summary] = client.get("/api/games").json()
+    [summary] = client.get("/api/games").json()["items"]
     assert (summary["source"], summary["white_name"], summary["analysis_status"]) == (
         "imported",
         "Paul Morphy",
         None,
     )
     client.post(f"/api/games/{gid}/analysis")
-    assert client.get("/api/games").json()[0]["analysis_status"] in ("pending", "running", "done")
+    assert client.get("/api/games").json()["items"][0]["analysis_status"] in (
+        "pending",
+        "running",
+        "done",
+    )
     assert client.get(f"/api/games/{gid}").json()["analysis_status"] is not None

@@ -3,9 +3,9 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 5 ("Ver por qué") — **cerrada** (2026-11-26, revisada por el usuario). Siguiente: Fase 6
-(aprendizaje a largo plazo, opcional): no empezar hasta que el usuario lo pida; entonces leer
-SPEC + ROADMAP + este archivo y proponer el plan.
+Fase 6a (importación automática) — **implementada, pendiente de la prueba manual con los
+usuarios reales (preguntarlos antes) y del OK del usuario**. Después, 6b (estadísticas) y 6c
+(entrenamiento), una a una, con plan aprobado (ver la sección de la Fase 6).
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -236,8 +236,33 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   tras el mínimo y no antes; sin espera extra si el motor ya tardó más; apertura del bot;
   recarga sin espera).
 
+### Fase 6a — Importación automática (pendiente de OK)
+- **Backend:** `app/sync/` (clientes de Lichess y Chess.com con httpx, parseo puro, servicio
+  de sincronización: primera vez 6 meses, incremental, «más antiguas», sin duplicados, color por
+  usuario, errores por cuenta), `analysis/queue.py` (cola en segundo plano: más reciente
+  primero, pausa persistente, un reintento), pool de motores con prioridades (interactivo >
+  primer plano > cola) y motor reservado, `api/sync.py` (`/accounts`, `/sync`, `/queue`),
+  `/games` con filtros y paginación. Reloj `%clk` guardado por jugada (también en PGN).
+- **Migración 0003:** columnas de origen online en `game`, `move.clock_s`,
+  `analysisjob.attempts`, tablas `importaccount` y `appsetting`. Se aplica sola al arrancar
+  (también en la base real cuando el usuario reinicie `make dev`).
+- **Frontend:** pantalla Ajustes (cuentas, estado, «Importar partidas más antiguas»),
+  Historial con «Sincronizar» y progreso, estado de la cola (pausar/reanudar), filtros en la
+  URL, paginación, filas compactas en móvil; la cabecera ya no se solapa en móvil.
+- **Dependencia nueva:** `httpx` pasa a dependencia de ejecución (ya estaba en el lock como
+  dependencia de desarrollo).
+- **Tests:** backend 354 (parseo, sincronización, cola, prioridad del pool), frontend 64,
+  e2e 15 (con `e2e/fake_platforms.py` como Lichess/Chess.com simulados).
+- **Decisiones del usuario (2026-11-27):** cuentas en Ajustes; 6 meses y ampliar hacia atrás;
+  correspondencia como ritmo; User-Agent genérico; cola más reciente primero; reloj guardado;
+  en 6b filtro de origen (por defecto partidas reales) y errores con poco tiempo; en 6c sin
+  bala por defecto.
+- **Sin ETag en Chess.com:** la incremental solo pide los meses desde la última partida, así que
+  no hacía falta; se puede añadir si hay muchas cuentas.
+
 ## Pendiente / siguiente paso
-- Fase 6 solo cuando el usuario lo pida.
+- Prueba manual de la 6a con los usuarios reales (preguntar los nombres; base temporal).
+- 6b y 6c tras el OK de la 6a.
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
   `make explain-report`); no se ha regenerado tras los ajustes de cierre de la Fase 5 (cambian
   el nivel 2 comparativo y algunas clasificaciones).

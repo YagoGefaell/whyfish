@@ -51,6 +51,13 @@ class GameSummary(BaseModel):
     termination: Termination | None
     move_count: int
     analysis_status: AnalysisStatus | None
+    # Synchronised games (phase 6a).
+    platform: str | None
+    external_url: str | None
+    played_at: datetime | None
+    time_class: str | None
+    white_elo: int | None
+    black_elo: int | None
 
     @classmethod
     def from_game(
@@ -72,7 +79,18 @@ class GameSummary(BaseModel):
             termination=game.termination,
             move_count=move_count,
             analysis_status=analysis_status,
+            platform=game.platform,
+            external_url=game.external_url,
+            played_at=game.played_at,
+            time_class=game.time_class,
+            white_elo=game.white_elo,
+            black_elo=game.black_elo,
         )
+
+
+class GamePage(BaseModel):
+    items: list[GameSummary]
+    total: int  # games matching the filters
 
 
 class BotThinkRead(BaseModel):

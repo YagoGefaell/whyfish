@@ -143,7 +143,7 @@ class TestStartFromFen:
         response = client.post("/api/games", json={"fen": "not a fen"})
         assert response.status_code == 400
         assert response.json()["detail"] == "El FEN no tiene un formato válido."
-        assert client.get("/api/games").json() == []
+        assert client.get("/api/games").json()["items"] == []
 
     def test_finished_position_is_rejected(self, client: TestClient) -> None:
         mate = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
@@ -301,7 +301,7 @@ class TestPgnAndHistory:
         first = create(client, color="white")
         play_all(client, first["id"], ["e2e4"])
         second = create(client, color="white")
-        games = client.get("/api/games").json()
+        games = client.get("/api/games").json()["items"]
         assert [(g["id"], g["move_count"]) for g in games] == [(second["id"], 0), (first["id"], 2)]
 
 

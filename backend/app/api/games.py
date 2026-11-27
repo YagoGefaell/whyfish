@@ -1,8 +1,8 @@
 import asyncio
-from typing import Annotated
+from typing import Annotated, Literal
 
 import chess
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 
 from app.api.deps import get_game_lock, get_game_repository, get_game_service, get_settings_dep
@@ -11,6 +11,7 @@ from app.api.schemas import (
     GameCreate,
     GameImport,
     GameImportRead,
+    GamePage,
     GameState,
     GameSummary,
     HintRead,
@@ -20,8 +21,9 @@ from app.api.schemas import (
 from app.config import LEVEL_PRESETS, Settings
 from app.engine.stockfish import EngineUnavailableError
 from app.play.pgn import PgnImportError, detect_user_color, parse_pgn
-from app.play.rules import IllegalMoveError, InvalidFenError
+from app.play.rules import IllegalMoveError, InvalidFenError, PlayerColor
 from app.play.service import (
+    GameFilters,
     GameNotFoundError,
     GameRepository,
     GameRuleError,
@@ -67,12 +69,25 @@ def list_levels() -> list[LevelRead]:
 
 
 @router.get("/games")
-def list_games(repo: Repo) -> list[GameSummary]:
+def list_games(
+    repo: Repo,
+    source: Literal["played", "imported"] | None = None,
+    platform: Literal["lichess", "chesscom", "pgn"] | None = None,
+    time_class: Literal["bullet", "blitz", "rapid", "classical", "correspondence"] | None = None,
+    result: Literal["win", "draw", "loss"] | None = None,
+    color: PlayerColor | None = None,
+    analysed: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> GamePage:
+    """History, most recent first, with the filters of the history page (phase 6a)."""
+    filters = GameFilters(source, platform, time_class, result, color, analysed)
+    rows, total = repo.list_filtered(filters, limit, offset)
     statuses = repo.analysis_statuses()
-    return [
-        GameSummary.from_game(game, count, statuses.get(game.id or 0))
-        for game, count in repo.list_with_move_counts()
-    ]
+    return GamePage(
+        items=[GameSummary.from_game(g, count, statuses.get(g.id or 0)) for g, count in rows],
+        total=total,
+    )
 
 
 @router.post("/games/import", status_code=status.HTTP_201_CREATED)

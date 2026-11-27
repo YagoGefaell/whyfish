@@ -76,9 +76,27 @@ Que el usuario **vea** la secuencia entera que lleva a la consecuencia de una ju
   reproducción y en la tarjeta final, en escritorio y móvil.
 
 ## Fase 6 — Aprendizaje a largo plazo (opcional)
-- Importar partidas desde Lichess/Chess.com.
-- Estadísticas por patrón (tipo de error, fase, motivo táctico), aperturas problemáticas.
-- Ejercicios generados a partir de los propios errores (repetición espaciada).
+En tres subfases, cada una cerrable por separado.
+
+### 6a — Importación automática
+- Cuentas de Lichess y Chess.com en Ajustes; "Sincronizar" en el Historial: primera vez los
+  últimos 6 meses, luego incremental; "Importar partidas más antiguas". Origen, ritmo, fecha,
+  rivales con Elo y reloj (`%clk`) por jugada.
+- Cola de análisis en segundo plano (más reciente primero, pausable, prioridad interactiva,
+  un motor libre, un reintento). Filtros en el Historial.
+- **Aceptación:** tests con plataformas simuladas (importación, incremental sin duplicados,
+  variantes, color, 429 y errores de red), tests de la cola y de la prioridad de motores, e2e
+  con servidor simulado; prueba manual con los usuarios reales en una base temporal.
+
+### 6b — Estadísticas
+- Datos precalculados por jugada (fase, tipo de error, apertura, reloj). Pantalla
+  "Estadísticas": precisión y su evolución, errores por fase, tipos de error, aperturas, errores
+  con poco tiempo, "Tus 3 puntos débiles"; todo lleva a las posiciones (`/review/:id?ply=N`).
+  Filtro de origen (por defecto partidas reales; contra el bot opcional).
+
+### 6c — Entrenamiento con mis errores
+- Ejercicios de tus ?, ?? y ✗ (sin posiciones decididas, sin solución poco clara, sin bala por
+  defecto), Leitner 5 cajas, sesión diaria de N, racha, filtros por tipo y fase.
 
 ## Fase 7 — Despliegue en Raspberry Pi (opcional)
 - Imagen Docker para ARM64 (o multi-arch) con frontend compilado servido por el backend.

@@ -21,6 +21,8 @@ class ParsedPgn:
     ucis: list[str]
     headers: dict[str, str]
     games_in_text: int  # only the first one is imported
+    # Mover's remaining time after each move (PGN %clk comments), None where missing.
+    clocks: tuple[float | None, ...] = ()
 
     @property
     def white(self) -> str | None:
@@ -59,14 +61,17 @@ def parse_pgn(text: str) -> ParsedPgn:
         count += 1
     if first.errors:
         raise PgnImportError(f"El PGN contiene jugadas no válidas: {first.errors[0]}")
-    ucis = [move.uci() for move in first.mainline_moves()]
+    nodes = list(first.mainline())
+    ucis = [node.move.uci() for node in nodes]
     if not ucis:
         raise PgnImportError("El PGN no contiene jugadas.")
+    clocks = tuple(node.clock() for node in nodes)
     return ParsedPgn(
         initial_fen=first.board().fen(),
         ucis=ucis,
         headers=dict(first.headers),
         games_in_text=count,
+        clocks=clocks if any(c is not None for c in clocks) else (),
     )
 
 

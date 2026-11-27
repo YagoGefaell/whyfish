@@ -8,10 +8,11 @@ import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 import chess
 import chess.engine
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, and_, col, func, or_, select
 
 from app.config import LEVEL_PRESETS, BotLevel, Settings
 from app.engine.stockfish import Engine
@@ -20,6 +21,7 @@ from app.models.game import Game, GameSource, Move, utcnow
 from app.play import rules
 from app.play.pgn import ParsedPgn, pgn_result
 from app.play.rules import DrawDecline, Outcome, PlayerColor
+from app.sync.types import OnlineGame
 
 
 class ColorChoice(StrEnum):
@@ -72,6 +74,29 @@ class GameRepository:
         ).all()
         return [(game, count) for game, count in rows]
 
+    def list_filtered(
+        self, filters: "GameFilters", limit: int, offset: int
+    ) -> tuple[list[tuple[Game, int]], int]:
+        """History page: games matching `filters`, most recent first (played or created)."""
+        conditions = filters.conditions()
+        query = select(Game, func.count(col(Move.id))).join(Move, isouter=True)
+        if filters.analysed is not None:
+            query = query.join(AnalysisJob, col(AnalysisJob.game_id) == col(Game.id), isouter=True)
+        count_query = select(func.count()).select_from(Game)
+        if filters.analysed is not None:
+            count_query = count_query.join(
+                AnalysisJob, col(AnalysisJob.game_id) == col(Game.id), isouter=True
+            )
+        for condition in conditions:
+            query = query.where(condition)
+            count_query = count_query.where(condition)
+        when = func.coalesce(col(Game.played_at), col(Game.created_at))
+        rows = self._session.exec(
+            query.group_by(col(Game.id)).order_by(when.desc()).limit(limit).offset(offset)
+        ).all()
+        total = self._session.exec(count_query).one()
+        return [(game, count) for game, count in rows], int(total)
+
     def analysis_statuses(self) -> dict[int, AnalysisStatus]:
         jobs = self._session.exec(select(AnalysisJob)).all()
         return {job.game_id: job.status for job in jobs}
@@ -92,6 +117,54 @@ class GameRepository:
     def delete_moves(self, moves: Sequence[Move]) -> None:
         for move in moves:
             self._session.delete(move)
+
+
+@dataclass(frozen=True)
+class GameFilters:
+    """History filters (phase 6a). None = any."""
+
+    source: str | None = None  # "played" (against the bot) | "imported" (PGN and online)
+    platform: str | None = None  # Platform value, or "pgn" for PGN imports
+    time_class: str | None = None
+    result: str | None = None  # "win" | "draw" | "loss", from the user's side
+    color: PlayerColor | None = None
+    analysed: bool | None = None
+
+    def conditions(self) -> list[Any]:
+        out: list[Any] = []
+        if self.source is not None:
+            out.append(col(Game.source) == GameSource(self.source))
+        if self.platform == "pgn":
+            out.append(col(Game.source) == GameSource.IMPORTED)
+            out.append(col(Game.platform).is_(None))
+        elif self.platform is not None:
+            out.append(col(Game.platform) == self.platform)
+        if self.time_class is not None:
+            out.append(col(Game.time_class) == self.time_class)
+        if self.color is not None:
+            out.append(col(Game.player_color) == self.color)
+        if self.result == "draw":
+            out.append(col(Game.result) == "1/2-1/2")
+        elif self.result in ("win", "loss"):
+            white_wins = "1-0" if self.result == "win" else "0-1"
+            black_wins = "0-1" if self.result == "win" else "1-0"
+            out.append(
+                or_(
+                    and_(
+                        col(Game.player_color) == PlayerColor.WHITE, col(Game.result) == white_wins
+                    ),
+                    and_(
+                        col(Game.player_color) == PlayerColor.BLACK, col(Game.result) == black_wins
+                    ),
+                )
+            )
+        if self.analysed is True:
+            out.append(col(AnalysisJob.status) == AnalysisStatus.DONE)
+        elif self.analysed is False:
+            out.append(
+                or_(col(AnalysisJob.id).is_(None), col(AnalysisJob.status) != AnalysisStatus.DONE)
+            )
+        return out
 
 
 def game_pgn(loaded: LoadedGame, player_name: str) -> str:
@@ -125,15 +198,23 @@ def game_pgn(loaded: LoadedGame, player_name: str) -> str:
     )
 
 
-def import_game(repo: GameRepository, parsed: ParsedPgn, user_color: PlayerColor) -> LoadedGame:
-    """Store an imported game. "Bot" moves are the opponent's (the side the user did not play)."""
+def import_game(
+    repo: GameRepository,
+    parsed: ParsedPgn,
+    user_color: PlayerColor,
+    online: OnlineGame | None = None,
+) -> LoadedGame:
+    """Store an imported game. "Bot" moves are the opponent's (the side the user did not play).
+
+    `online`: the platform's data for a synchronised game (origin, pace, ratings...).
+    """
     board = chess.Board(parsed.initial_fen)
     moves: list[Move] = []
-    for uci in parsed.ucis:
+    for i, uci in enumerate(parsed.ucis):
         mover = board.turn
-        moves.append(
-            _record(board, chess.Move.from_uci(uci), by_bot=mover != user_color.chess_color)
-        )
+        move = _record(board, chess.Move.from_uci(uci), by_bot=mover != user_color.chess_color)
+        move.clock_s = parsed.clocks[i] if i < len(parsed.clocks) else None
+        moves.append(move)
     outcome = rules.game_outcome(board)
     game = Game(
         source=GameSource.IMPORTED,
@@ -147,6 +228,15 @@ def import_game(repo: GameRepository, parsed: ParsedPgn, user_color: PlayerColor
         termination=outcome.termination if outcome else None,
         ended_at=utcnow(),
     )
+    if online is not None:
+        game.platform = online.platform
+        game.external_id = online.external_id
+        game.external_url = online.url
+        game.played_at = online.played_at
+        game.time_class = online.time_class
+        game.time_control = online.time_control
+        game.white_name, game.black_name = online.white, online.black
+        game.white_elo, game.black_elo = online.white_elo, online.black_elo
     repo.save(game, moves)
     assert game.id is not None
     return repo.load(game.id)

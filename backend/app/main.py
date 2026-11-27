@@ -5,13 +5,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.analysis.queue import AnalysisQueue
 from app.analysis.runner import AnalysisService
-from app.api import analysis, games, health, why
+from app.api import analysis, games, health, sync, why
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
 from app.engine.pool import PoolManager
 from app.engine.state import EngineState
 from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
+from app.sync.service import ClientFactory, SyncService
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ def create_app(
     settings: Settings | None = None,
     engine_factory: EngineFactory = StockfishEngine.start,
     analysis_engine_factory: EngineFactory = StockfishEngine.start_for_analysis,
+    sync_client_factory: ClientFactory | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
 
@@ -53,9 +56,17 @@ def create_app(
         analysis_service = AnalysisService(db_engine, resolved_settings, pools, engine_name)
         analysis_service.mark_interrupted()
         app.state.analysis_service = analysis_service
+        queue = AnalysisQueue(db_engine, resolved_settings, analysis_service)
+        app.state.analysis_queue = queue
+        app.state.sync_service = SyncService(
+            db_engine, resolved_settings, sync_client_factory, on_imported=queue.wake
+        )
+        queue.start()
         try:
             yield
         finally:
+            await app.state.sync_service.stop()
+            await queue.stop()
             await analysis_service.shutdown()
             await pools.close()
             if engine_state.engine is not None:
@@ -67,6 +78,7 @@ def create_app(
     app.include_router(games.router, prefix=API_PREFIX)
     app.include_router(analysis.router, prefix=API_PREFIX)
     app.include_router(why.router, prefix=API_PREFIX)
+    app.include_router(sync.router, prefix=API_PREFIX)
     return app
 
 

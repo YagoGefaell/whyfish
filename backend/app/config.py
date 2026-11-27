@@ -76,6 +76,20 @@ class Settings(BaseSettings):
     # reach its consequence point (one engine line, cached per position), and how long each
     # step of the replay lasts in the browser.
     why_extend_time_s: float = 0.2
+    # Online sync (phase 6a): public APIs (overridable for tests), a generic User-Agent (no
+    # personal data), how far back the first sync (and each "older games" step) goes, timeouts
+    # and the wait before retrying after HTTP 429.
+    lichess_url: str = "https://lichess.org"
+    chesscom_url: str = "https://api.chess.com"
+    sync_user_agent: str = "whyfish (local chess learning app)"
+    sync_months: int = 6
+    sync_timeout_s: float = 30.0
+    sync_retry_wait_s: float = 60.0
+    # Background analysis queue: engines left free for interactive use, optional rest between
+    # games (e.g. to let a Raspberry Pi cool down), and whether it runs at all.
+    queue_reserved_engines: int = 1
+    queue_pause_between_s: float = 0.0
+    queue_enabled: bool = True
     why_step_ms: int = 1000
 
     # --- Storage ----------------------------------------------------------

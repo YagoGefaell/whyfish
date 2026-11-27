@@ -24,6 +24,7 @@ class AnalysisJob(SQLModel, table=True):
     done: int = 0
     total: int = 0
     error: str | None = None
+    attempts: int = 0  # background queue: a failed analysis is retried once
     created_at: datetime = Field(default_factory=utcnow)
     finished_at: datetime | None = None
 

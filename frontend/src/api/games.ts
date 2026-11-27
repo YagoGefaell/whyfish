@@ -45,6 +45,32 @@ export interface GameSummary {
   termination: Termination | null
   move_count: number
   analysis_status: AnalysisStatus | null
+  /** Synchronised from Lichess / Chess.com (phase 6a); null otherwise. */
+  platform: Platform | null
+  external_url: string | null
+  played_at: string | null
+  time_class: TimeClass | null
+  white_elo: number | null
+  black_elo: number | null
+}
+
+export type Platform = 'lichess' | 'chesscom'
+export type TimeClass = 'bullet' | 'blitz' | 'rapid' | 'classical' | 'correspondence'
+
+/** History filters; undefined = any. `platform: 'pgn'` = imported from a PGN. */
+export interface GameFilters {
+  source?: GameSource
+  platform?: Platform | 'pgn'
+  time_class?: TimeClass
+  result?: 'win' | 'draw' | 'loss'
+  color?: Color
+  analysed?: boolean
+}
+
+export interface GamePage {
+  items: GameSummary[]
+  /** Games matching the filters. */
+  total: number
 }
 
 export interface GameState extends GameSummary {
@@ -87,7 +113,15 @@ const post = <T>(path: string, body?: unknown) =>
 
 export const gamesApi = {
   levels: () => request<Level[]>('/levels'),
-  list: () => request<GameSummary[]>('/games'),
+  list: (filters: GameFilters = {}, limit = 50, offset = 0) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined) params.set(key, String(value))
+    }
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return request<GamePage>(`/games?${params.toString()}`)
+  },
   get: (id: number) => request<GameState>(`/games/${String(id)}`),
   create: (body: NewGame) => post<GameState>('/games', body),
   move: (id: number, uci: string) => post<GameState>(`/games/${String(id)}/moves`, { uci }),

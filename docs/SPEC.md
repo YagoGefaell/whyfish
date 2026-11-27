@@ -23,12 +23,38 @@
 - Al terminar: botón **"Analizar partida"**.
 
 ### 1.2 Importar
-- Pegar o subir un **PGN** (primera partida, línea principal; admite `[SetUp]`/`[FEN]`), o
-  (fase posterior) importar desde Lichess/Chess.com por usuario. Un FEN suelto no se importa:
-  para eso está "Nueva partida desde FEN".
+- Pegar o subir un **PGN** (primera partida, línea principal; admite `[SetUp]`/`[FEN]`). Un
+  FEN suelto no se importa: para eso está "Nueva partida desde FEN". Si el PGN trae `%clk`, se
+  guarda el tiempo restante de cada jugada.
 - El color del usuario se indica o se detecta comparando `PLAYER_NAME` con las cabeceras
   `White`/`Black`; si no se puede, la app pregunta.
 - Mismo flujo de análisis que una partida jugada (las importadas siempre son analizables).
+
+### 1.2b Sincronización con Lichess y Chess.com (Fase 6a)
+- **Cuentas** (una por plataforma) en la pantalla **Ajustes**, guardadas en la base. Cambiar el
+  usuario empieza de cero el rango de esa cuenta.
+- **Sincronizar** (botón del Historial, sin sincronización periódica): la primera vez, los
+  últimos `SYNC_MONTHS` (6) meses; después, solo las partidas posteriores a la más reciente
+  importada. «Importar partidas más antiguas» (Ajustes) amplía el rango 6 meses hacia atrás.
+- APIs públicas sin autenticación: Lichess `GET /api/games/user/{u}` (ndjson, `sort=dateAsc`,
+  con `%clk`; una petición a la vez) y Chess.com (archivos mensuales, en serie). Ante HTTP 429,
+  espera `SYNC_RETRY_WAIT_S` y reintenta una vez. `User-Agent` genérico, sin datos personales.
+- Se leen de la más antigua a la más reciente y se guardan una a una: una sincronización
+  cortada continúa donde se quedó; nunca se guarda una partida dos veces (plataforma + id).
+  Errores de red o de la API: se guardan por cuenta (`last_error`) y se muestran; la otra
+  cuenta sigue.
+- Solo ajedrez normal (también desde posición); variantes y partidas contra la IA de Lichess
+  se descartan. Color del usuario: el bando cuyo nombre es su usuario (sin distinguir
+  mayúsculas). Se guardan origen, enlace, fecha de inicio, ritmo (bala, blitz, rápida,
+  clásica, correspondencia), control de tiempo, rivales con su Elo y el reloj por jugada.
+- **Cola de análisis en segundo plano:** las partidas sincronizadas se analizan solas, de una
+  en una, **de la más reciente a la más antigua**. Una partida que el usuario abre se analiza
+  en primer plano y pasa delante. Prioridad de motores: interactivo (explorar, "Ver por qué",
+  "Pruébalo tú") > análisis abierto por el usuario > cola; la cola deja libres
+  `QUEUE_RESERVED_ENGINES` (1) motores. Se puede pausar (persistente); `QUEUE_PAUSE_BETWEEN_S`
+  añade un respiro entre partidas (Pi). Una partida que falla se reintenta una vez.
+- **Historial:** filtros de origen (Lichess, Chess.com, PGN, contra el bot), ritmo, resultado
+  (desde el lado del usuario), color y analizada o no, guardados en la URL; paginación (50).
 
 ### 1.3 Revisión (Game Review)
 - **Mientras se analiza**, el tablero ya muestra la partida y el panel la barra de progreso.
@@ -339,11 +365,16 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
   esa secuencia).
 - `POST /games/{id}/moves/{ply}/try` (`{uci}`) → `{uci, san, classification, correct, why}`:
   "Pruébalo tú" (la posición anterior ya está analizada: solo se evalúa el intento).
-- `GET /games` historial
+- `GET /games?source&platform&time_class&result&color&analysed&limit&offset` → `{items, total}`
+  (historial filtrado, el más reciente primero).
+- `GET/PUT /accounts` (usuarios de Lichess / Chess.com y su estado) · `GET /sync`,
+  `POST /sync {older}` (sincronizar; progreso por cuenta) · `GET /queue`, `POST /queue/pause`,
+  `POST /queue/resume` (cola de análisis).
 
 ## 7. Persistencia
-SQLite: `Game`, `Move`, `AnalysisJob`, `PositionAnalysis` (caché por posición + historia
-reversible + ajustes). Migraciones con **Alembic**
+SQLite: `Game` (con origen online, ritmo, Elo), `Move` (con reloj), `AnalysisJob` (con
+intentos de la cola), `PositionAnalysis` (caché por posición + historia reversible + ajustes),
+`ImportAccount` (cuentas sincronizadas y su rango), `AppSetting` (ajustes clave/valor). Migraciones con **Alembic**
 (`backend/migrations/`), aplicadas al arrancar; una base anterior a Alembic se marca con la
 revisión base y se migra.
 

@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 import chess
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.config import BotLevel
@@ -17,7 +18,27 @@ class GameSource(StrEnum):
     IMPORTED = "imported"  # from a PGN
 
 
+class Platform(StrEnum):
+    """Online platform an imported game comes from (stored as its value)."""
+
+    LICHESS = "lichess"
+    CHESSCOM = "chesscom"
+
+
+class TimeClass(StrEnum):
+    """Pace of an online game (stored as its value)."""
+
+    BULLET = "bullet"
+    BLITZ = "blitz"
+    RAPID = "rapid"
+    CLASSICAL = "classical"
+    CORRESPONDENCE = "correspondence"
+
+
 class Game(SQLModel, table=True):
+    # An online game is imported once (NULLs are not equal in SQLite: other games are free).
+    __table_args__ = (UniqueConstraint("platform", "external_id"),)
+
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=utcnow)
     ended_at: datetime | None = None
@@ -38,6 +59,15 @@ class Game(SQLModel, table=True):
     # "1-0", "0-1", "1/2-1/2"; None while the game is ongoing.
     result: str | None = None
     termination: Termination | None = None
+    # Games synchronised from Lichess / Chess.com (phase 6a).
+    platform: str | None = Field(default=None, index=True)  # Platform value
+    external_id: str | None = None
+    external_url: str | None = None
+    played_at: datetime | None = Field(default=None, index=True)  # start of the game (UTC)
+    time_class: str | None = None  # TimeClass value
+    time_control: str | None = None  # PGN TimeControl, e.g. "180+2", "1/259200"
+    white_elo: int | None = None
+    black_elo: int | None = None
 
     @property
     def is_over(self) -> bool:
@@ -52,3 +82,4 @@ class Move(SQLModel, table=True):
     san: str
     fen_after: str
     by_bot: bool
+    clock_s: float | None = None  # mover's remaining time after the move (PGN %clk), if known

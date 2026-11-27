@@ -8,7 +8,8 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import create_engine
 
 import app.models.analysis
-import app.models.game  # noqa: F401
+import app.models.game
+import app.models.sync  # noqa: F401
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 # Schema of databases created before Alembic was introduced (phases 1-2, via create_all).

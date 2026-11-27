@@ -26,6 +26,12 @@ export function gameState(overrides: Partial<GameState> = {}): GameState {
     undo_count: 0,
     hint_count: 0,
     bot_think: { min_s: 0, max_s: 0 },
+    platform: null,
+    external_url: null,
+    played_at: null,
+    time_class: null,
+    white_elo: null,
+    black_elo: null,
     ...overrides,
   }
 }
