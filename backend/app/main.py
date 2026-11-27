@@ -8,12 +8,13 @@ from fastapi import FastAPI
 from app.analysis.book import default_book
 from app.analysis.queue import AnalysisQueue
 from app.analysis.runner import AnalysisService
-from app.api import analysis, games, health, sync, why
+from app.api import analysis, games, health, stats, sync, why
 from app.config import Settings, get_settings
 from app.db import init_db, make_db_engine
 from app.engine.pool import PoolManager
 from app.engine.state import EngineState
 from app.engine.stockfish import Engine, EngineUnavailableError, StockfishEngine
+from app.stats.insights import InsightService
 from app.sync.service import ClientFactory, SyncService
 
 logger = logging.getLogger(__name__)
@@ -62,13 +63,20 @@ def create_app(
         app.state.sync_service = SyncService(
             db_engine, resolved_settings, sync_client_factory, on_imported=queue.wake
         )
+        insights = InsightService(
+            db_engine, analysis_service, use_process=resolved_settings.insights_process
+        )
+        app.state.insights = insights
+        analysis_service.on_done = insights.wake
         queue.start()
         # The openings book takes ~2 s to build: load it now, in a thread, so the first review
         # does not wait for it (lru_cache keeps it for every later call).
         book_loading = asyncio.create_task(asyncio.to_thread(default_book))
+        insights.start()
         try:
             yield
         finally:
+            await insights.stop()
             await book_loading
             await app.state.sync_service.stop()
             await queue.stop()
@@ -84,6 +92,7 @@ def create_app(
     app.include_router(analysis.router, prefix=API_PREFIX)
     app.include_router(why.router, prefix=API_PREFIX)
     app.include_router(sync.router, prefix=API_PREFIX)
+    app.include_router(stats.router, prefix=API_PREFIX)
     return app
 
 

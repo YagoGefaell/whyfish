@@ -6,6 +6,7 @@ from sqlmodel import SQLModel
 
 import app.models.analysis
 import app.models.game
+import app.models.insight
 import app.models.sync  # noqa: F401
 from app.config import get_settings
 

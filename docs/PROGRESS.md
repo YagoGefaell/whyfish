@@ -3,9 +3,9 @@
 _Claude Code mantiene este archivo al final de cada sesión._
 
 ## Fase actual
-Fase 6a (importación automática) — **implementada, pendiente de la prueba manual con los
-usuarios reales (preguntarlos antes) y del OK del usuario**. Después, 6b (estadísticas) y 6c
-(entrenamiento), una a una, con plan aprobado (ver la sección de la Fase 6).
+Fase 6a (importación) — **cerrada** (2026-11-27). Fase 6b (estadísticas) — **implementada,
+pendiente del OK del usuario** (informe `docs/reports/stats-fase6b.html`). Después, 6c
+(entrenamiento) con plan aprobado.
 Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fases renumeradas:
 5 "Ver por qué", 6 aprendizaje a largo plazo, 7 Raspberry Pi; LLM y chat en "Ideas futuras".
 
@@ -236,7 +236,7 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
   tras el mínimo y no antes; sin espera extra si el motor ya tardó más; apertura del bot;
   recarga sin espera).
 
-### Fase 6a — Importación automática (pendiente de OK)
+### Fase 6a — Importación automática (cerrada 2026-11-27)
 - **Backend:** `app/sync/` (clientes de Lichess y Chess.com con httpx, parseo puro, servicio
   de sincronización: primera vez 6 meses, incremental, «más antiguas», sin duplicados, color por
   usuario, errores por cuenta), `analysis/queue.py` (cola en segundo plano: más reciente
@@ -260,9 +260,37 @@ Cambio de rumbo (2026-11-26): sin LLM; explicaciones siempre por plantilla. Fase
 - **Sin ETag en Chess.com:** la incremental solo pide los meses desde la última partida, así que
   no hacía falta; se puede añadir si hay muchas cuentas.
 
+- **Arreglos tras la prueba (commit aparte):** libro de aperturas cargado en segundo plano al
+  arrancar; «Pausar» detiene la cola tras la posición en curso y al reanudar sigue con esa
+  partida desde la caché; el contador de descartes incluye los filtrados en la descarga.
+- **Prueba manual (Chess.com «Jacky838», base temporal):** 56 partidas de 6 meses (0
+  descartes; 50 rápidas, 5 blitz, 1 bala), color correcto en todas, reloj idéntico al PGN,
+  sincronización 4,1 s, cola 10,7 s/partida (171 ms/posición), interactivo 0,1–0,4 s con la
+  cola en marcha, segunda sincronización sin duplicados.
+- La migración 0003 se aplicó a la base real al recargarse `make dev` durante el desarrollo
+  (sin copia previa; integridad comprobada). Copias: `data/backups/whyfish-2026-11-27-*`.
+  Para fases con migraciones: parar `make dev` y copiar la base antes.
+
+### Fase 6b — Estadísticas (pendiente de OK)
+- **Backend:** `app/stats/` (`insights.py`: cálculo puro por partida/jugada + servicio que lo
+  mantiene al día en un proceso aparte; `aggregate.py`: estadísticas y puntos débiles, puro;
+  `queries.py`; `report.py`), `GET /api/stats`. Migración 0004 (`gameinsight`,
+  `moveinsight`). Umbrales en `config.py` (`StatsThresholds`).
+- **Frontend:** pantalla Estadísticas (filtros en la URL, aviso de pocas partidas, puntos
+  débiles con ejemplos, gráfica de precisión SVG, fases, tipos, poco tiempo, aperturas),
+  `/review/:id?ply=N`, menú que se ajusta en móvil (con 5 enlaces se salía de la pantalla).
+- **Cálculo en un proceso aparte:** en un hilo competía por el GIL con el servidor y ralentizaba
+  los análisis (e2e de 1 min → más de 4 min); en un proceso, normal. Los tests unitarios lo
+  hacen en un hilo (`INSIGHTS_PROCESS=false`).
+- **Informe:** `docs/reports/stats-fase6b.html` (`make stats-report`), sobre una copia temporal
+  de la base del usuario + sus 56 partidas de Chess.com (caché de análisis reutilizada).
+- **Decisiones por defecto:** errores = ?, ?? y ✗; poco tiempo = reloj < mín(30 s, 10 % del
+  inicial); aperturas agrupadas por familia (nombre antes de «:»); «sin causa táctica clara»
+  no cuenta como punto débil; coste de una apertura = sus errores en la fase de apertura.
+- **Tests:** backend 366, frontend 67, e2e 18.
+
 ## Pendiente / siguiente paso
-- Prueba manual de la 6a con los usuarios reales (preguntar los nombres; base temporal).
-- 6b y 6c tras el OK de la 6a.
+- OK de la 6b del usuario; después, la 6c (entrenamiento).
 - Informe de la Fase 4: `docs/reports/explanations-fase4.html` (regenerar con
   `make explain-report`); no se ha regenerado tras los ajustes de cierre de la Fase 5 (cambian
   el nivel 2 comparativo y algunas clasificaciones).

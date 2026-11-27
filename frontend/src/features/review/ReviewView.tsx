@@ -56,17 +56,21 @@ interface Props {
   status?: ReactNode
   /** Game info line (event · date · result · opening), aligned with the board. */
   meta?: ReactNode
+  /** Open on this move (0-based ply), in the review tab: links from the statistics. */
+  initialPly?: number | null
 }
 
-export function ReviewView({ game, review, status, meta }: Props) {
+export function ReviewView({ game, review, status, meta, initialPly = null }: Props) {
   const moves = useMemo(() => game.moves.map((m) => m.uci), [game.moves])
   const fens = useMemo(() => mainLineFens(game.initial_fen, moves), [game.initial_fen, moves])
   const last = fens.length - 1
   const orientation = review?.perspective ?? game.player_color
-  const [position, setPosition] = useState(0)
+  const opening = initialPly !== null && initialPly >= 0 && initialPly < game.moves.length
+  // Position after move `initialPly` (position i = after i moves).
+  const [position, setPosition] = useState(opening ? initialPly + 1 : 0)
   const [animate, setAnimate] = useState(false)
   const [exploration, setExploration] = useState<Exploration | null>(null)
-  const [tab, setTab] = useState<Tab>('summary')
+  const [tab, setTab] = useState<Tab>(opening ? 'review' : 'summary')
   // "Profundizar" is open for this position only (closes when moving on).
   const [deepAt, setDeepAt] = useState<number | null>(null)
   // "Ver por qué": the sequence being replayed (fromTry: opened from "Pruébalo tú").

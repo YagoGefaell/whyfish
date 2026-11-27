@@ -56,6 +56,30 @@
 - **Historial:** filtros de origen (Lichess, Chess.com, PGN, contra el bot), ritmo, resultado
   (desde el lado del usuario), color y analizada o no, guardados en la URL; paginación (50).
 
+### 1.2c Estadísticas (Fase 6b)
+- **Datos precalculados** por partida analizada (`GameInsight`: precisión, resultado, apertura
+  y su familia, tiempo inicial) y por jugada del usuario (`MoveInsight`: clasificación, Δ,
+  fase, tipo de error = idea principal de la Fase 4, reloj y si fue con poco tiempo). Se
+  calculan al terminar cada análisis, en un proceso aparte (no compite con el servidor), y en
+  segundo plano para las antiguas; llevan versión de reglas (`INSIGHTS_VERSION`) y se recalculan
+  si cambia o si la partida se vuelve a analizar.
+- **Pantalla "Estadísticas"** (`/stats`), solo partidas analizadas; por defecto, partidas
+  reales (Lichess, Chess.com, PGN); las de contra el bot, opcionales. Filtros: ritmo, color,
+  periodo. Dice cuántas partidas cuentan, cuántas faltan por analizar y avisa si son menos de
+  10.
+- **Errores** = ?, ?? y ✗. Bloques: precisión media y su evolución (media móvil de 5);
+  errores cada 10 jugadas propias por fase; tipos de error (pieza colgada, táctica del rival no
+  vista, mate permitido/no visto, ganancia no vista, material perdido; «sin causa táctica
+  clara» cuando no hay hechos); errores con poco tiempo (reloj < mín(30 s, 10 % del tiempo
+  inicial)), comparados con los cometidos con tiempo; aperturas por familia y color, peores = ≥ 3
+  partidas y < 50 % de los puntos.
+- **«Tus 3 puntos débiles»:** candidatos tipo×fase (≥ 3 errores; nunca «sin causa táctica
+  clara»), aperturas peores (coste: sus errores de apertura) y «gestión del tiempo» si los
+  errores con poco reloj son ≥ 2 veces más frecuentes (≥ 20 jugadas con poco tiempo);
+  ordenados por probabilidad de ganar perdida por partida analizada. Texto corto, consejo y
+  ejemplos; llevan el filtro de entrenamiento de la 6c.
+- Todo lleva a las posiciones: `/review/:id?ply=N` abre la revisión en esa jugada.
+
 ### 1.3 Revisión (Game Review)
 - **Mientras se analiza**, el tablero ya muestra la partida y el panel la barra de progreso.
 - **Primero el Resumen:** precisión de cada jugador (la del usuario destacada), tabla de
@@ -370,11 +394,14 @@ Todas las rutas van bajo el prefijo `/api` (p. ej. `/api/games`), igual en desar
 - `GET/PUT /accounts` (usuarios de Lichess / Chess.com y su estado) · `GET /sync`,
   `POST /sync {older}` (sincronizar; progreso por cuenta) · `GET /queue`, `POST /queue/pause`,
   `POST /queue/resume` (cola de análisis).
+- `GET /stats?include_bot&time_class&color&days` → `{games_finished, games_unanalysed,
+  insights_pending, stats}` (estadísticas, Fase 6b).
 
 ## 7. Persistencia
 SQLite: `Game` (con origen online, ritmo, Elo), `Move` (con reloj), `AnalysisJob` (con
 intentos de la cola), `PositionAnalysis` (caché por posición + historia reversible + ajustes),
-`ImportAccount` (cuentas sincronizadas y su rango), `AppSetting` (ajustes clave/valor). Migraciones con **Alembic**
+`ImportAccount` (cuentas sincronizadas y su rango), `AppSetting` (ajustes clave/valor),
+`GameInsight` / `MoveInsight` (datos precalculados de las estadísticas). Migraciones con **Alembic**
 (`backend/migrations/`), aplicadas al arrancar; una base anterior a Alembic se marca con la
 revisión base y se migra.
 

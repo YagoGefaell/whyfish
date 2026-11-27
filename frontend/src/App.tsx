@@ -1,4 +1,4 @@
-import { FileUp, History, Settings, Swords } from 'lucide-react'
+import { ChartColumn, FileUp, History, Settings, Swords } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { EngineStatus } from './components/EngineStatus'
@@ -8,6 +8,7 @@ import { NewGamePage } from './features/play/NewGamePage'
 import { PlayPage } from './features/play/PlayPage'
 import { ReviewPage } from './features/review/ReviewPage'
 import { SettingsPage } from './features/settings/SettingsPage'
+import { StatsPage } from './features/stats/StatsPage'
 
 function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children: ReactNode }) {
   return (
@@ -33,7 +34,7 @@ export default function App() {
         <h1 className="text-lg font-bold tracking-tight">
           why<span className="text-accent">fish</span>
         </h1>
-        <nav className="flex gap-1">
+        <nav className="flex flex-wrap gap-1">
           <NavItem to="/" icon={<Swords size={16} />}>
             Jugar
           </NavItem>
@@ -42,6 +43,9 @@ export default function App() {
           </NavItem>
           <NavItem to="/games" icon={<History size={16} />}>
             Historial
+          </NavItem>
+          <NavItem to="/stats" icon={<ChartColumn size={16} />}>
+            Estadísticas
           </NavItem>
           <NavItem to="/settings" icon={<Settings size={16} />}>
             Ajustes
@@ -59,6 +63,7 @@ export default function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/review/:id" element={<ReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/stats" element={<StatsPage />} />
           <Route path="*" element={<p>Página no encontrada.</p>} />
         </Routes>
       </main>

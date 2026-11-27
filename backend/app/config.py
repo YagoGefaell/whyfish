@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     queue_reserved_engines: int = 1
     queue_pause_between_s: float = 0.0
     queue_enabled: bool = True
+    # Statistics data is computed in a separate process (not to compete with the server for
+    # the GIL); False runs it in a thread (unit tests).
+    insights_process: bool = True
     why_step_ms: int = 1000
 
     # --- Storage ----------------------------------------------------------
@@ -236,3 +239,29 @@ class FactThresholds:
 
 
 FACTS = FactThresholds()
+
+
+# --- Statistics (phase 6b) -------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StatsThresholds:
+    # Fewer analysed games than this: the page warns that conclusions are shaky.
+    min_games: int = 10
+    # An opening (family, colour) is judged with at least this many games.
+    opening_min_games: int = 3
+    # Low time: remaining clock below the smaller of these (seconds / fraction of the base time).
+    low_time_s: float = 30.0
+    low_time_fraction: float = 0.10
+    # "Gestión del tiempo" is a weak point when errors are this many times more frequent with
+    # low time than without, over at least `time_min_moves` low-time moves.
+    time_weak_ratio: float = 2.0
+    time_min_moves: int = 20
+    # A weak point (error type x phase) needs at least this many errors.
+    weak_min_errors: int = 3
+    weak_points: int = 3
+    examples_max: int = 20
+    moving_average: int = 5
+
+
+STATS = StatsThresholds()

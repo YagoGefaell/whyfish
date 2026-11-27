@@ -266,3 +266,15 @@ describe('ReviewView', () => {
     expect(sent[0]?.body).toMatchObject({ moves: ['e2e4'] })
   })
 })
+
+describe('ReviewView ?ply=', () => {
+  it('opens on that move, in the review tab', () => {
+    render(
+      <MemoryRouter>
+        <ReviewView game={FOOLS_GAME} review={FOOLS_REVIEW} initialPly={2} />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('tab', { name: 'Revisión' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(panel()).getAllByRole('heading')[0]).toHaveTextContent('g4 es un grave error')
+  })
+})

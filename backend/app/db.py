@@ -9,6 +9,7 @@ from sqlmodel import create_engine
 
 import app.models.analysis
 import app.models.game
+import app.models.insight
 import app.models.sync  # noqa: F401
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]

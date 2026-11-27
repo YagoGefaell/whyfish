@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { gamesApi, type GameState } from '../../api/games'
 import { playerNames } from './names'
@@ -21,6 +21,10 @@ function ReviewLoader({ gameId, factory }: { gameId: number; factory?: EventSour
   const { phase, start } = useAnalysis(gameId, factory)
   const location = useLocation()
   const warnings = (location.state as { warnings?: string[] } | null)?.warnings ?? []
+  // ?ply=N (0-based): open on that move, e.g. from the statistics.
+  const [params] = useSearchParams()
+  const plyParam = params.get('ply')
+  const ply = plyParam !== null && /^\d+$/.test(plyParam) ? Number(plyParam) : null
 
   useEffect(() => {
     gamesApi
@@ -51,7 +55,9 @@ function ReviewLoader({ gameId, factory }: { gameId: number; factory?: EventSour
         Revisión: {names.white} contra {names.black}
       </h2>
       <ReviewView
+        key={ply ?? 'start'}
         game={game}
+        initialPly={ply}
         review={phase.kind === 'ready' ? phase.review : null}
         status={<AnalysisStatus phase={phase} game={game} onStart={start} />}
         meta={

@@ -112,7 +112,11 @@ class FakeEngine:
 
 def make_settings(**overrides: object) -> Settings:
     # model_validate skips env/.env loading, so unit tests are hermetic.
-    values: dict[str, object] = {"stockfish_path": None, "database_url": "sqlite://"}
+    values: dict[str, object] = {
+        "stockfish_path": None,
+        "database_url": "sqlite://",
+        "insights_process": False,  # a thread: no worker process per test app
+    }
     values.update(overrides)
     return Settings.model_validate(values)
 

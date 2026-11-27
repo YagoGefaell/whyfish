@@ -110,6 +110,8 @@ class AnalysisService:
         # Games the background queue is analysing / that the user asked for meanwhile.
         self._background: set[int] = set()
         self._promoted: set[int] = set()
+        # Called with the game id when an analysis finishes (statistics, phase 6b).
+        self.on_done: Callable[[int], None] = lambda game_id: None
 
     # --- Lifecycle --------------------------------------------------------
 
@@ -386,6 +388,7 @@ class AnalysisService:
             if done < len(todo):
                 raise AnalysisPaused()
         await self._update(game_id, status=AnalysisStatus.DONE, finished=True)
+        self.on_done(game_id)
 
     async def _update(
         self,
